@@ -19,8 +19,16 @@ tg_application_instance = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """إدارة دورة حياة السيرفر: تشغيل بوت التليجرام مباشرة داخل حلقة asyncio الرئيسية"""
+    """إدارة دورة حياة السيرفر: مزامنة Turso Cloud وتشغيل بوت التليجرام مباشرة داخل حلقة asyncio الرئيسية"""
     global tg_application_instance
+
+    # 1. استيراد أحدث نسخة من قاعدة بيانات Turso Cloud عند الإقلاع
+    try:
+        from database.turso_sync import sync_from_turso_on_boot
+        sync_from_turso_on_boot()
+    except Exception as e:
+        print(f"[Lifespan] ⚠️ تعذر المزامنة من Turso: {e}")
+
     token = os.getenv("TELEGRAM_BOT_TOKEN") or settings.TELEGRAM_BOT_TOKEN
     
     if token:

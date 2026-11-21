@@ -3,6 +3,14 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from config.settings import settings
 
+def _turso_sync(query: str, params: tuple = ()):
+    """مزامنة الاستعلام في الخلفية مع Turso Cloud لحماية البيانات من الضياع"""
+    try:
+        from database.turso_sync import sync_query_to_turso
+        sync_query_to_turso(query, list(params))
+    except Exception as e:
+        pass
+
 class DatabaseManager:
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = str(db_path or settings.DATABASE_PATH)
@@ -105,7 +113,17 @@ class DatabaseManager:
                 phone=excluded.phone
             """, (name, url, platform, city_area, category, phone, discovery_source))
             conn.commit()
-            return cursor.lastrowid
+            last_id = cursor.lastrowid
+            _turso_sync("""
+            INSERT INTO stores (name, url, platform, city_area, category, phone, discovery_source)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(url) DO UPDATE SET
+                name=excluded.name,
+                city_area=excluded.city_area,
+                category=excluded.category,
+                phone=excluded.phone
+            """, (name, url, platform, city_area, category, phone, discovery_source))
+            return last_id
 
     def get_all_stores(self, verified_only: bool = True) -> List[Dict[str, Any]]:
         """جلب جميع المتاجر المسجلة"""
@@ -132,12 +150,14 @@ class DatabaseManager:
                 SET name = ?, city_area = ?, category = ?, phone = ?, url = ?
                 WHERE id = ?
                 """, (name, city_area, category, phone, url, store_id))
+                _turso_sync("UPDATE stores SET name = ?, city_area = ?, category = ?, phone = ?, url = ? WHERE id = ?", (name, city_area, category, phone, url, store_id))
             else:
                 cursor.execute("""
                 UPDATE stores 
                 SET name = ?, city_area = ?, category = ?, phone = ?
                 WHERE id = ?
                 """, (name, city_area, category, phone, store_id))
+                _turso_sync("UPDATE stores SET name = ?, city_area = ?, category = ?, phone = ? WHERE id = ?", (name, city_area, category, phone, store_id))
             conn.commit()
             return cursor.rowcount > 0
 
@@ -196,7 +216,16 @@ class DatabaseManager:
                       raw_post_url, media_type, summary_ar, location, phone_contact, 
                       post_time_text, int(creation_time or 0), image_url))
                 conn.commit()
-                return cursor.lastrowid
+                last_id = cursor.lastrowid
+                _turso_sync("""
+                INSERT INTO deals (store_id, product_name, price, currency, is_bargain, 
+                                  raw_post_url, media_type, summary_ar, location, phone_contact, 
+                                  post_time_text, creation_time, image_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (store_id, product_name, price, currency, int(is_bargain), 
+                      raw_post_url, media_type, summary_ar, location, phone_contact, 
+                      post_time_text, int(creation_time or 0), image_url))
+                return last_id
             except sqlite3.IntegrityError:
                 return None  # الصفقة مسجلة مسبقاً
 
@@ -300,6 +329,7 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM deals WHERE id = ?", (deal_id,))
             conn.commit()
+            _turso_sync("DELETE FROM deals WHERE id = ?", (deal_id,))
             return cursor.rowcount > 0
 
     def toggle_store_status(self, store_id: int) -> Optional[int]:
@@ -308,6 +338,7 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("UPDATE stores SET is_verified = 1 - is_verified WHERE id = ?", (store_id,))
             conn.commit()
+            _turso_sync("UPDATE stores SET is_verified = 1 - is_verified WHERE id = ?", (store_id,))
             cursor.execute("SELECT is_verified FROM stores WHERE id = ?", (store_id,))
             row = cursor.fetchone()
             return row[0] if row else None
@@ -322,6 +353,11 @@ class DatabaseManager:
             WHERE id = ?
             """, (product_name, price, summary_ar, location, deal_id))
             conn.commit()
+            _turso_sync("""
+            UPDATE deals 
+            SET product_name = ?, price = ?, summary_ar = ?, location = ?
+            WHERE id = ?
+            """, (product_name, price, summary_ar, location, deal_id))
             return cursor.rowcount > 0
 
     def delete_store(self, store_id: int) -> bool:
@@ -331,6 +367,8 @@ class DatabaseManager:
             cursor.execute("DELETE FROM deals WHERE store_id = ?", (store_id,))
             cursor.execute("DELETE FROM stores WHERE id = ?", (store_id,))
             conn.commit()
+            _turso_sync("DELETE FROM deals WHERE store_id = ?", (store_id,))
+            _turso_sync("DELETE FROM stores WHERE id = ?", (store_id,))
             return cursor.rowcount > 0
 
     def extend_subscriber_trial(self, chat_id: str, days: int = 7) -> bool:
@@ -349,12 +387,14 @@ class DatabaseManager:
             except Exception:
                 base_dt = datetime.now()
             new_dt = base_dt + timedelta(days=days)
+            new_date_str = new_dt.strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute("""
             UPDATE subscribers 
             SET trial_ends_at = ?, subscription_status = 'trial'
             WHERE telegram_chat_id = ?
-            """, (new_dt.strftime("%Y-%m-%d %H:%M:%S"), str(chat_id)))
+            """, (new_date_str, str(chat_id)))
             conn.commit()
+            _turso_sync("UPDATE subscribers SET trial_ends_at = ?, subscription_status = 'trial' WHERE telegram_chat_id = ?", (new_date_str, str(chat_id)))
             return True
 
     def update_subscriber_status(self, chat_id: str, status: str) -> bool:
@@ -363,6 +403,7 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("UPDATE subscribers SET subscription_status = ? WHERE telegram_chat_id = ?", (status, str(chat_id)))
             conn.commit()
+            _turso_sync("UPDATE subscribers SET subscription_status = ? WHERE telegram_chat_id = ?", (status, str(chat_id)))
             return cursor.rowcount > 0
 
 db = DatabaseManager()
