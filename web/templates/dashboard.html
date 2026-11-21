@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم رادار صفقات غزة ⚡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            900: '#064e3b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+        .tab-btn.active {
+            border-bottom: 3px solid #10b981;
+            color: #10b981;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-bolt text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                        رادار صفقات غزة
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">الإدارة المركزية</span>
+                    </h1>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950/60 border border-slate-700 text-xs text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    محرك الرصد الذاتي: <strong class="text-emerald-400">نشط</strong>
+                </span>
+                <a href="https://t.me/gaza_safaqat_bot" target="_blank" class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition">
+                    <i class="fa-brands fa-telegram text-sm"></i>
+                    فتح البوت
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- Stat Cards Grid -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5" id="stats-section">
+            <div class="bg-slate-800/60 border border-slate-700/80 p-5 rounded-2xl flex items-center justify-between shadow-sm">
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">المشتركون بالبوت</p>
+                    <h3 class="text-3xl font-black text-white" id="stat-subs">...</h3>
+                    <p class="text-xs text-emerald-400 mt-1 flex items-center gap-1 font-semibold">
+                        <i class="fa-solid fa-gift"></i> <span id="stat-subs-trial">...</span> تجريبي مجاني
+                    </p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/80 p-5 rounded-2xl flex items-center justify-between shadow-sm">
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">المتاجر المعتمدة</p>
+                    <h3 class="text-3xl font-black text-white" id="stat-stores">...</h3>
+                    <p class="text-xs text-slate-400 mt-1">تغطي كافة محافظات القطاع</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-store"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/80 p-5 rounded-2xl flex items-center justify-between shadow-sm">
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">عروض اليوم الحية</p>
+                    <h3 class="text-3xl font-black text-emerald-400" id="stat-today-deals">...</h3>
+                    <p class="text-xs text-slate-400 mt-1">من إجمالي <span id="stat-total-deals" class="text-white font-bold">...</span> صفقة</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-fire"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/80 p-5 rounded-2xl flex items-center justify-between shadow-sm">
+                <div>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">العروض المصورة</p>
+                    <h3 class="text-3xl font-black text-white" id="stat-img-deals">...</h3>
+                    <p class="text-xs text-purple-400 mt-1 flex items-center gap-1 font-semibold">
+                        <i class="fa-solid fa-image"></i> مع بوستر الإعلان الأصلي
+                    </p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-photo-film"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Navigation Tabs -->
+        <div class="border-b border-slate-700 flex gap-8">
+            <button onclick="switchTab('deals')" id="tab-btn-deals" class="tab-btn active pb-4 px-2 text-sm font-bold flex items-center gap-2 text-slate-300 hover:text-white transition">
+                <i class="fa-solid fa-tags"></i>
+                إدارة الصفقات والسلع
+            </button>
+            <button onclick="switchTab('stores')" id="tab-btn-stores" class="tab-btn pb-4 px-2 text-sm font-bold flex items-center gap-2 text-slate-300 hover:text-white transition">
+                <i class="fa-solid fa-shop"></i>
+                المتاجر المعتمدة (88)
+            </button>
+            <button onclick="switchTab('subscribers')" id="tab-btn-subscribers" class="tab-btn pb-4 px-2 text-sm font-bold flex items-center gap-2 text-slate-300 hover:text-white transition">
+                <i class="fa-solid fa-user-group"></i>
+                المشتركون والاشتراكات
+            </button>
+            <button onclick="switchTab('broadcast')" id="tab-btn-broadcast" class="tab-btn pb-4 px-2 text-sm font-bold flex items-center gap-2 text-slate-300 hover:text-white transition">
+                <i class="fa-solid fa-bullhorn"></i>
+                بث إشعار عام للمشتركين
+            </button>
+        </div>
+
+        <!-- TAB 1: DEALS MANAGEMENT -->
+        <section id="tab-deals" class="space-y-6">
+            <div class="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
+                <div class="flex-1 relative">
+                    <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3.5 text-slate-400 text-sm"></i>
+                    <input type="text" id="deal-search-input" oninput="loadDeals()" placeholder="ابحث باسم السلعة، المحل، أو المنطقة..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pr-10 pl-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="flex items-center gap-3">
+                    <select id="deal-area-filter" onchange="loadDeals()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <option value="">كافة المناطق</option>
+                        <option value="غزة">مدينة غزة والشمال</option>
+                        <option value="دير البلح">دير البلح</option>
+                        <option value="الوسطى">المحافظة الوسطى / النصيرات</option>
+                        <option value="خانيونس">خانيونس</option>
+                        <option value="رفح">رفح والمواصي</option>
+                    </select>
+                    <button onclick="loadDeals()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 transition">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        تحديث
+                    </button>
+                </div>
+            </div>
+
+            <!-- Deals Table -->
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-slate-900/60 text-slate-400 text-xs font-bold uppercase border-b border-slate-700">
+                            <tr>
+                                <th class="p-4">الصورة</th>
+                                <th class="p-4">اسم السلعة</th>
+                                <th class="p-4">السعر</th>
+                                <th class="p-4">المتجر والموقع</th>
+                                <th class="p-4">توقيت النشر</th>
+                                <th class="p-4 text-center">إجراءات الإدارة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deals-table-body" class="divide-y divide-slate-700/50">
+                            <tr>
+                                <td colspan="6" class="text-center p-8 text-slate-500">
+                                    <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2"></i>
+                                    <p>جاري تحميل الصفقات المرصودة...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: STORES MANAGEMENT -->
+        <section id="tab-stores" class="space-y-6 hidden">
+            <div class="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
+                <div class="flex-1 relative">
+                    <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3.5 text-slate-400 text-sm"></i>
+                    <input type="text" id="store-search-input" oninput="loadStores()" placeholder="ابحث باسم المتجر أو منطقته..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pr-10 pl-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="openAddStoreModal()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition">
+                        <i class="fa-solid fa-plus"></i>
+                        إضافة متجر جديد للرادار
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stores Table -->
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-slate-900/60 text-slate-400 text-xs font-bold uppercase border-b border-slate-700">
+                            <tr>
+                                <th class="p-4">#</th>
+                                <th class="p-4">اسم المتجر</th>
+                                <th class="p-4">المنطقة الجغرافية</th>
+                                <th class="p-4">التصنيف</th>
+                                <th class="p-4">الهاتف</th>
+                                <th class="p-4">حالة المراقبة</th>
+                                <th class="p-4 text-center">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stores-table-body" class="divide-y divide-slate-700/50">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: SUBSCRIBERS MANAGEMENT -->
+        <section id="tab-subscribers" class="space-y-6 hidden">
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-slate-900/60 text-slate-400 text-xs font-bold uppercase border-b border-slate-700">
+                            <tr>
+                                <th class="p-4">الاسم الكامل</th>
+                                <th class="p-4">معرف التليجرام</th>
+                                <th class="p-4">Chat ID</th>
+                                <th class="p-4">نوع الاشتراك</th>
+                                <th class="p-4">انتهاء الصلاحية</th>
+                                <th class="p-4 text-center">تمديد أو ترقية</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subs-table-body" class="divide-y divide-slate-700/50">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: BROADCAST MESSAGE -->
+        <section id="tab-broadcast" class="space-y-6 hidden">
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-6 max-w-3xl mx-auto space-y-6 shadow-sm">
+                <div>
+                    <h3 class="text-lg font-black text-white flex items-center gap-2">
+                        <i class="fa-solid fa-bullhorn text-emerald-400"></i>
+                        بث إشعار عام فوري لجميع المشتركين في تليجرام
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">تصل هذه الرسالة فوراً في نفس اللحظة لهواتف كافة المشتركين المسجلين في البوت.</p>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-slate-300">نص الرسالة أو الإشعار:</label>
+                    <textarea id="broadcast-msg-input" rows="5" placeholder="اكتب نص الإشعار هنا... مثال:
+عروض حصرية اليوم على المواد التموينية واللحوم في دير البلح وخانيونس، تصفحوها الآن عبر القائمة الرئيسية /menu" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-emerald-500 leading-relaxed"></textarea>
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                    <span class="text-xs text-slate-400">
+                        <i class="fa-solid fa-shield-halved text-emerald-400 ml-1"></i>
+                        الرسالة مشفرة ومحمية من النسخ وإعادة التوجيه
+                    </span>
+                    <button onclick="sendBroadcast()" id="btn-broadcast" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        إرسال البث الآن
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- EDIT DEAL MODAL -->
+    <div id="edit-deal-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-pen text-emerald-400"></i>
+                    تعديل بيانات السلعة
+                </h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <input type="hidden" id="edit-deal-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">اسم السلعة:</label>
+                    <input type="text" id="edit-product-name" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-300 block mb-1">السعر (شيكل):</label>
+                        <input type="number" step="0.5" id="edit-price" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-300 block mb-1">الموقع / المدينة:</label>
+                        <input type="text" id="edit-location" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">تفاصيل العرض:</label>
+                    <textarea id="edit-summary" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"></textarea>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-700">
+                <button onclick="closeEditModal()" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition">إلغاء</button>
+                <button onclick="saveDealEdit()" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 transition">
+                    <i class="fa-solid fa-check"></i>
+                    حفظ التعديلات
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT STORE MODAL -->
+    <div id="edit-store-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-store text-amber-400"></i>
+                    تعديل بيانات المتجر (العنوان والجوال)
+                </h3>
+                <button onclick="closeEditStoreModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <input type="hidden" id="edit-store-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">اسم المتجر أو السوبرماركت:</label>
+                    <input type="text" id="edit-store-name" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-300 block mb-1">العنوان / المنطقة بالتفصيل:</label>
+                        <input type="text" id="edit-store-area" placeholder="مثال: دير البلح - غرب دوار البركة" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-300 block mb-1">رقم الهاتف / الجوال للتواصل:</label>
+                        <input type="text" id="edit-store-phone" placeholder="0599xxxxxx" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500 font-mono">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">التصنيف التجاري:</label>
+                    <input type="text" id="edit-store-category" placeholder="تموين، لحوم، منظفات..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">رابط صفحة الفيسبوك:</label>
+                    <input type="url" id="edit-store-url" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500 text-left" dir="ltr">
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-700">
+                <button onclick="closeEditStoreModal()" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition">إلغاء</button>
+                <button onclick="saveStoreEdit()" class="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 transition">
+                    <i class="fa-solid fa-check"></i>
+                    حفظ التعديلات
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD STORE MODAL -->
+    <div id="add-store-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-plus text-emerald-400"></i>
+                    إضافة متجر جديد لرادار المراقبة
+                </h3>
+                <button onclick="closeAddStoreModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">رابط صفحة الفيسبوك للمتجر:</label>
+                    <input type="url" id="add-store-url" placeholder="https://www.facebook.com/..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 text-left" dir="ltr">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">اسم المتجر أو السوبرماركت:</label>
+                    <input type="text" id="add-store-name" placeholder="مثال: سوبرماركت الإيمان" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-300 block mb-1">المنطقة الجغرافية:</label>
+                        <select id="add-store-area" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <option value="مدينة غزة">مدينة غزة</option>
+                            <option value="دير البلح">دير البلح</option>
+                            <option value="المحافظة الوسطى">المحافظة الوسطى / النصيرات</option>
+                            <option value="خانيونس">خانيونس</option>
+                            <option value="رفح والمواصي">رفح والمواصي</option>
+                            <option value="شمال غزة">شمال غزة</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-300 block mb-1">التصنيف:</label>
+                        <input type="text" id="add-store-category" placeholder="تموين وسوبرماركت" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">رقم الهاتف (اختياري):</label>
+                    <input type="text" id="add-store-phone" placeholder="0599xxxxxx" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-700">
+                <button onclick="closeAddStoreModal()" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition">إلغاء</button>
+                <button onclick="saveNewStore()" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 transition">
+                    <i class="fa-solid fa-save"></i>
+                    إضافة وبدء الرصد
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT STORE MODAL -->
+    <div id="edit-store-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-store text-amber-400"></i>
+                    تعديل بيانات المتجر (العنوان والجوال)
+                </h3>
+                <button onclick="closeEditStoreModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <input type="hidden" id="edit-store-id">
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">اسم المتجر أو السوبرماركت:</label>
+                    <input type="text" id="edit-store-name" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-300 block mb-1">العنوان / المنطقة بالتفصيل:</label>
+                        <input type="text" id="edit-store-area" placeholder="مثال: دير البلح - غرب دوار البركة" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-300 block mb-1">رقم الهاتف / الجوال للتواصل:</label>
+                        <input type="text" id="edit-store-phone" placeholder="0599xxxxxx" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500 font-mono">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">التصنيف التجاري:</label>
+                    <input type="text" id="edit-store-category" placeholder="تموين، لحوم، منظفات..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-300 block mb-1">رابط صفحة الفيسبوك:</label>
+                    <input type="url" id="edit-store-url" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-amber-500 text-left" dir="ltr">
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-700">
+                <button onclick="closeEditStoreModal()" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition">إلغاء</button>
+                <button onclick="saveStoreEdit()" class="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 transition">
+                    <i class="fa-solid fa-check"></i>
+                    حفظ التعديلات
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // State
+        let allDeals = [];
+        let allStores = [];
+        let allSubs = [];
+
+        // Tab Switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-btn-' + tab).classList.add('active');
+
+            ['deals', 'stores', 'subscribers', 'broadcast'].forEach(t => {
+                document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+            });
+
+            if (tab === 'deals') loadDeals();
+            if (tab === 'stores') loadStores();
+            if (tab === 'subscribers') loadSubscribers();
+        }
+
+        // Load Stats
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                document.getElementById('stat-subs').innerText = data.total_subs || 0;
+                document.getElementById('stat-subs-trial').innerText = data.trial_subs || 0;
+                document.getElementById('stat-stores').innerText = data.verified_stores || 0;
+                document.getElementById('stat-today-deals').innerText = data.today_deals || 0;
+                document.getElementById('stat-total-deals').innerText = data.total_deals || 0;
+                document.getElementById('stat-img-deals').innerText = data.deals_with_images || 0;
+            } catch (e) {
+                console.error("Error loading stats:", e);
+            }
+        }
+
+        // Load Deals
+        async function loadDeals() {
+            const tbody = document.getElementById('deals-table-body');
+            const search = document.getElementById('deal-search-input').value.toLowerCase();
+            const area = document.getElementById('deal-area-filter').value;
+
+            try {
+                const res = await fetch('/api/deals');
+                allDeals = await res.json();
+
+                let filtered = allDeals.filter(d => {
+                    const textMatch = !search || 
+                        (d.product_name && d.product_name.toLowerCase().includes(search)) ||
+                        (d.store_name && d.store_name.toLowerCase().includes(search)) ||
+                        (d.location && d.location.toLowerCase().includes(search));
+                    const areaMatch = !area || (d.location && d.location.includes(area));
+                    return textMatch && areaMatch;
+                });
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-slate-500">لا توجد صفقات تطابق البحث.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = filtered.map(d => {
+                    const imgHtml = d.image_url 
+                        ? `<img src="${d.image_url}" class="w-12 h-12 object-cover rounded-lg border border-slate-700 cursor-pointer hover:scale-110 transition" onclick="window.open('${d.image_url}')">`
+                        : `<div class="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center text-slate-600 border border-slate-700 text-xs"><i class="fa-solid fa-cube"></i></div>`;
+                    
+                    const postLink = d.raw_post_url ? `<a href="${d.raw_post_url}" target="_blank" class="text-sky-400 hover:text-sky-300 text-xs flex items-center gap-1 mt-1"><i class="fa-solid fa-arrow-up-right-from-square"></i> المنشور الأصلي</a>` : '';
+
+                    return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="p-4">${imgHtml}</td>
+                        <td class="p-4 font-bold text-white">${d.product_name}</td>
+                        <td class="p-4 font-extrabold text-emerald-400">${d.price} ${d.currency || 'ILS'}</td>
+                        <td class="p-4">
+                            <div class="font-bold text-slate-200">${d.store_name || 'متجر معتمد'}</div>
+                            <div class="text-xs text-slate-400">${d.location || 'قطاع غزة'}</div>
+                            ${postLink}
+                        </td>
+                        <td class="p-4 text-xs text-slate-400">${d.post_time_text || 'اليوم'}</td>
+                        <td class="p-4 text-center">
+                            <div class="inline-flex items-center gap-2">
+                                <button onclick="openEditModal(${d.id})" class="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs transition" title="تعديل">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="deleteDeal(${d.id})" class="p-2 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white text-xs transition" title="حذف">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    `;
+                }).join('');
+
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-rose-400">خطأ في جلب الصفقات: ${e.message}</td></tr>`;
+            }
+        }
+
+        // Delete Deal
+        async function deleteDeal(dealId) {
+            if (!confirm(`هل أنت متأكد من حذف هذه الصفقة (ID #${dealId}) نهائياً؟`)) return;
+            try {
+                const res = await fetch(`/api/deals/${dealId}`, { method: 'DELETE' });
+                if (res.ok) {
+                    loadDeals();
+                    loadStats();
+                } else {
+                    alert("فشل حذف الصفقة");
+                }
+            } catch (e) {
+                alert("خطأ: " + e.message);
+            }
+        }
+
+        // Edit Deal Modal
+        function openEditModal(dealId) {
+            const deal = allDeals.find(d => d.id === dealId);
+            if (!deal) return;
+            document.getElementById('edit-deal-id').value = deal.id;
+            document.getElementById('edit-product-name').value = deal.product_name;
+            document.getElementById('edit-price').value = deal.price;
+            document.getElementById('edit-location').value = deal.location || '';
+            document.getElementById('edit-summary').value = deal.summary_ar || '';
+            document.getElementById('edit-deal-modal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-deal-modal').classList.add('hidden');
+        }
+
+        async function saveDealEdit() {
+            const id = document.getElementById('edit-deal-id').value;
+            const data = {
+                product_name: document.getElementById('edit-product-name').value,
+                price: parseFloat(document.getElementById('edit-price').value),
+                location: document.getElementById('edit-location').value,
+                summary_ar: document.getElementById('edit-summary').value
+            };
+            try {
+                const res = await fetch(`/api/deals/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    closeEditModal();
+                    loadDeals();
+                } else {
+                    alert("فشل حفظ التعديلات");
+                }
+            } catch (e) {
+                alert("خطأ: " + e.message);
+            }
+        }
+
+        // Load Stores
+        async function loadStores() {
+            const tbody = document.getElementById('stores-table-body');
+            const search = document.getElementById('store-search-input').value.toLowerCase();
+            try {
+                const res = await fetch('/api/stores');
+                allStores = await res.json();
+
+                let filtered = allStores.filter(s => {
+                    return !search || 
+                        (s.name && s.name.toLowerCase().includes(search)) ||
+                        (s.city_area && s.city_area.toLowerCase().includes(search));
+                });
+
+                tbody.innerHTML = filtered.map((s, idx) => {
+                    const statusBadge = s.is_verified 
+                        ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">نشط يرصده الرادار</span>`
+                        : `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-700 text-slate-400">معطل مؤقتاً</span>`;
+
+                    return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="p-4 text-xs text-slate-500">${idx + 1}</td>
+                        <td class="p-4 font-bold text-white flex items-center gap-2">
+                            ${s.name}
+                            <a href="${s.url}" target="_blank" class="text-slate-400 hover:text-sky-400 text-xs" title="فتح صفحة فيسبوك"><i class="fa-brands fa-facebook"></i></a>
+                        </td>
+                        <td class="p-4 text-xs font-semibold text-slate-300">${s.city_area || 'غزة'}</td>
+                        <td class="p-4 text-xs text-slate-400">${s.category || 'عام'}</td>
+                        <td class="p-4 text-xs text-slate-400">${s.phone || '-'}</td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4 text-center">
+                            <div class="inline-flex items-center gap-2">
+                                <button onclick="openEditStoreModal(${s.id})" class="p-2 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-900 text-xs font-bold transition" title="تعديل بيانات المتجر (العنوان والجوال)">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="toggleStoreStatus(${s.id})" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-bold text-white transition">
+                                    ${s.is_verified ? 'إيقاف الرصد' : 'تفعيل'}
+                                </button>
+                                <button onclick="deleteStore(${s.id})" class="p-2 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white text-xs transition" title="حذف المتجر">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-rose-400">خطأ: ${e.message}</td></tr>`;
+            }
+        }
+
+        async function toggleStoreStatus(id) {
+            try {
+                const res = await fetch(`/api/stores/${id}/toggle`, { method: 'POST' });
+                if (res.ok) loadStores();
+            } catch (e) { alert("خطأ: " + e.message); }
+        }
+
+        async function deleteStore(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا المتجر وكافة صفقاته نهائياً من قاعدة البيانات؟")) return;
+            try {
+                const res = await fetch(`/api/stores/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    loadStores();
+                    loadStats();
+                }
+            } catch (e) { alert("خطأ: " + e.message); }
+        }
+
+        function openAddStoreModal() {
+            document.getElementById('add-store-modal').classList.remove('hidden');
+        }
+        function closeAddStoreModal() {
+            document.getElementById('add-store-modal').classList.add('hidden');
+        }
+
+        async function saveNewStore() {
+            const data = {
+                url: document.getElementById('add-store-url').value.trim(),
+                name: document.getElementById('add-store-name').value.trim(),
+                city_area: document.getElementById('add-store-area').value,
+                category: document.getElementById('add-store-category').value.trim(),
+                phone: document.getElementById('add-store-phone').value.trim()
+            };
+            if (!data.url || !data.name) {
+                alert("يرجى إدخال رابط الصفحة واسم المتجر على الأقل");
+                return;
+            }
+            try {
+                const res = await fetch('/api/stores', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    closeAddStoreModal();
+                    loadStores();
+                    loadStats();
+                    alert("تمت إضافة المتجر بنجاح وبدأ الرادار بمراقبته!");
+                } else {
+                    alert("فشل إضافة المتجر");
+                }
+            } catch (e) { alert("خطأ: " + e.message); }
+        }
+
+        // Edit Store Modal Handlers
+        function openEditStoreModal(storeId) {
+            const store = allStores.find(s => s.id === storeId);
+            if (!store) return;
+            document.getElementById('edit-store-id').value = store.id;
+            document.getElementById('edit-store-name').value = store.name || '';
+            document.getElementById('edit-store-area').value = store.city_area || '';
+            document.getElementById('edit-store-phone').value = (store.phone && store.phone !== 'None') ? store.phone : '';
+            document.getElementById('edit-store-category').value = store.category || '';
+            document.getElementById('edit-store-url').value = store.url || '';
+            document.getElementById('edit-store-modal').classList.remove('hidden');
+        }
+
+        function closeEditStoreModal() {
+            document.getElementById('edit-store-modal').classList.add('hidden');
+        }
+
+        async function saveStoreEdit() {
+            const id = document.getElementById('edit-store-id').value;
+            const data = {
+                name: document.getElementById('edit-store-name').value.trim(),
+                city_area: document.getElementById('edit-store-area').value.trim(),
+                phone: document.getElementById('edit-store-phone').value.trim(),
+                category: document.getElementById('edit-store-category').value.trim(),
+                url: document.getElementById('edit-store-url').value.trim()
+            };
+            if (!data.name) {
+                alert("يرجى إدخال اسم المتجر");
+                return;
+            }
+            try {
+                const res = await fetch(`/api/stores/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    closeEditStoreModal();
+                    loadStores();
+                    alert("✅ تم حفظ وتحديث بيانات المتجر (العنوان ورقم الجوال) بنجاح!");
+                } else {
+                    alert("فشل تحديث بيانات المتجر");
+                }
+            } catch (e) {
+                alert("خطأ: " + e.message);
+            }
+        }
+
+        // Load Subscribers
+        async function loadSubscribers() {
+            const tbody = document.getElementById('subs-table-body');
+            try {
+                const res = await fetch('/api/subscribers');
+                allSubs = await res.json();
+
+                tbody.innerHTML = allSubs.map(s => {
+                    const statusBadge = s.subscription_status === 'trial'
+                        ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">تجريبي مجاني</span>`
+                        : `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">اشتراك مفعل</span>`;
+
+                    return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="p-4 font-bold text-white">${s.full_name || 'صديق صفقات'}</td>
+                        <td class="p-4 text-xs text-sky-400">${s.username ? '@' + s.username : '-'}</td>
+                        <td class="p-4 text-xs font-mono text-slate-400">${s.telegram_chat_id}</td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4 text-xs text-slate-300 font-mono">${s.trial_ends_at || '-'}</td>
+                        <td class="p-4 text-center">
+                            <div class="inline-flex items-center gap-2">
+                                <button onclick="extendSub('${s.telegram_chat_id}', 7)" class="px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition">
+                                    +7 أيام مجانية
+                                </button>
+                                <button onclick="activateSub('${s.telegram_chat_id}')" class="px-3 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white text-xs font-bold transition">
+                                    تفعيل دائم ✅
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-rose-400">خطأ: ${e.message}</td></tr>`;
+            }
+        }
+
+        async function extendSub(chatId, days) {
+            try {
+                const res = await fetch(`/api/subscribers/${chatId}/extend?days=${days}`, { method: 'POST' });
+                if (res.ok) {
+                    loadSubscribers();
+                    alert(`تم تمديد اشتراك المستخدم بمقدار ${days} أيام بنجاح.`);
+                }
+            } catch (e) { alert("خطأ: " + e.message); }
+        }
+
+        async function activateSub(chatId) {
+            try {
+                const res = await fetch(`/api/subscribers/${chatId}/status?status=active`, { method: 'POST' });
+                if (res.ok) {
+                    loadSubscribers();
+                    loadStats();
+                    alert("تمت ترقية المشترك إلى اشتراك مفعل بنجاح!");
+                }
+            } catch (e) { alert("خطأ: " + e.message); }
+        }
+
+        // Broadcast to Telegram
+        async function sendBroadcast() {
+            const msg = document.getElementById('broadcast-msg-input').value.trim();
+            if (!msg) {
+                alert("يرجى كتابة نص الإشعار أولاً");
+                return;
+            }
+            if (!confirm("هل أنت متأكد من إرسال هذا البث فوراً لجميع المشتركين؟")) return;
+
+            const btn = document.getElementById('btn-broadcast');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> جاري الإرسال...`;
+
+            try {
+                const res = await fetch('/api/broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✅ تم إرسال البث بنجاح إلى ${data.sent_count} مشترك.`);
+                    document.getElementById('broadcast-msg-input').value = '';
+                } else {
+                    alert("تعذر إرسال البث: " + (data.detail || "خطأ غير معروف"));
+                }
+            } catch (e) {
+                alert("خطأ: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> إرسال البث الآن`;
+            }
+        }
+
+        // Init on load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadDeals();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.env
+temp_media/
+__pycache__/
+*.pyc
+.system_generated/
+scratch/
+.DS_Store
