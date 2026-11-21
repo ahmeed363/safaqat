@@ -56,6 +56,20 @@ async def serve_dashboard():
 
 # --- API Endpoints ---
 
+@app.get("/api/health")
+def health_status():
+    """فحص سلامة السيرفر ومتغيرات البيئة السحابية"""
+    import os
+    from config.settings import settings
+    return {
+        "status": "healthy",
+        "has_telegram_bot_token": bool(os.getenv("TELEGRAM_BOT_TOKEN") or settings.TELEGRAM_BOT_TOKEN),
+        "has_gemini_api_key": bool(os.getenv("GEMINI_API_KEY") or settings.GEMINI_API_KEY),
+        "has_turso_db": bool(os.getenv("TURSO_DATABASE_URL") or os.getenv("TURSO_AUTH_TOKEN")),
+        "verified_stores": len(db.get_all_stores(verified_only=True)),
+        "night_mode": getattr(settings, "NIGHT_MODE_ENABLED", True)
+    }
+
 @app.get("/api/stats")
 async def get_stats():
     """إحصائيات المنظومة الحية"""

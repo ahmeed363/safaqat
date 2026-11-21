@@ -58,13 +58,27 @@ def run_monitor_worker():
         time.sleep(interval_seconds)
 
 def run_bot_worker():
-    """عامل تشغيل بوت التليجرام في خيط منفصل"""
+    """عامل تشغيل بوت التليجرام في خيط منفصل مع حماية كاملة على السحابة"""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN") or settings.TELEGRAM_BOT_TOKEN
+    if not token:
+        print("[CloudBot] ❌ خطأ: TELEGRAM_BOT_TOKEN غير متوفر في متغيرات البيئة!")
+        return
+
     print("[CloudBot] 🤖 بدء تشغيل بوت التليجرام لرادار الصفقات...")
-    try:
-        tg_app = create_telegram_app()
-        tg_app.run_polling(drop_pending_updates=True)
-    except Exception as e:
-        print(f"[CloudBot] ⚠️ خطأ في تشغيل بوت التليجرام: {e}")
+    while True:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            tg_app = create_telegram_app()
+            # stop_signals=None ضروري لمنع خطأ الإشارات عند التشغيل في Thread منفصل على لينكس
+            tg_app.run_polling(drop_pending_updates=False, stop_signals=None, close_loop=False)
+        except Exception as e:
+            import traceback
+            print(f"[CloudBot] ⚠️ توقف بوت التليجرام مؤقتاً: {e}")
+            traceback.print_exc()
+            import time
+            time.sleep(5)
+            print("[CloudBot] 🔄 إعادة تشغيل بوت التليجرام تلقائياً...")
 
 def main():
     print("=" * 65)
