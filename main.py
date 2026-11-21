@@ -49,19 +49,43 @@ def run_discovery():
     added = discovery_engine.run_discovery_cycle()
     print(f"🎉 انتهت دورة الاستكشاف بنجاح. المتاجر المعتمدة الجديدة: {added}")
 
+def is_gaza_night_time() -> bool:
+    """فحص ما إذا كان الوقت الحالي في غزة يقع ضمن فترة السكون الليلي (من 12 ليلاً حتى 7 صباحاً)"""
+    if not getattr(settings, "NIGHT_MODE_ENABLED", True):
+        return False
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("Asia/Gaza"))
+        hour = now.hour
+    except Exception:
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone(timedelta(hours=2)))
+        hour = now.hour
+
+    start = getattr(settings, "NIGHT_START_HOUR", 0)  # 12:00 منتصف الليل
+    end = getattr(settings, "NIGHT_END_HOUR", 7)      # 07:00 صباحاً
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
+
 def run_monitor(continuous: bool = False, interval_minutes: int = 15):
-    """تشغيل دورة فحص المتاجر ورصد الصفقات الحالية"""
+    """تشغيل دورة فحص المتاجر ورصد الصفقات الحالية مع وضع السكون الليلي"""
     print_banner()
     if continuous:
         print(f"🔄 وضع الرصد التلقائي المستمر نشط! سيتم فحص كافة المتاجر دورياً كل {interval_minutes} دقيقة...")
+        print(f"🌙 وضع السكون الليلي مفعل من {settings.NIGHT_START_HOUR}:00 إلى {settings.NIGHT_END_HOUR}:00 بتوقيت غزة.")
         while True:
             try:
-                found = monitor_engine.run_monitoring_round()
-                print(f"🎉 انتهت جولة الفحص. عدد الصفقات اللقطة الجديدة: {len(found)}")
-                # بث الصفقات الجديدة فوراً للمشتركين
-                if found:
-                    print(f"[Dispatcher] 📢 جاري بث {len(found)} صفقة جديدة للمشتركين...")
-                    asyncio.run(alert_dispatcher.broadcast_all_pending_deals())
+                if is_gaza_night_time():
+                    print("🌙 فترة السكون الليلي لمتاجر غزة (المتاجر مغلقة). الرادار في وضع الراحة لتوفير الموارد.")
+                else:
+                    found = monitor_engine.run_monitoring_round()
+                    print(f"🎉 انتهت جولة الفحص. عدد الصفقات اللقطة الجديدة: {len(found)}")
+                    # بث الصفقات الجديدة فوراً للمشتركين
+                    if found:
+                        print(f"[Dispatcher] 📢 جاري بث {len(found)} صفقة جديدة للمشتركين...")
+                        asyncio.run(alert_dispatcher.broadcast_all_pending_deals())
                 print(f"⏳ الانتظار لمدة {interval_minutes} دقيقة حتى الجولة القادمة...\n")
                 time.sleep(interval_minutes * 60)
             except KeyboardInterrupt:

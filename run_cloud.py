@@ -14,18 +14,42 @@ from bot.telegram_bot import create_telegram_app
 from core.monitor_engine import monitor_engine
 from bot.alert_dispatcher import alert_dispatcher
 
+def is_gaza_night_time() -> bool:
+    """فحص ما إذا كان الوقت الحالي في غزة يقع ضمن فترة السكون الليلي (من 12 ليلاً حتى 7 صباحاً)"""
+    if not getattr(settings, "NIGHT_MODE_ENABLED", True):
+        return False
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("Asia/Gaza"))
+        hour = now.hour
+    except Exception:
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone(timedelta(hours=2)))
+        hour = now.hour
+
+    start = getattr(settings, "NIGHT_START_HOUR", 0)  # 12:00 منتصف الليل
+    end = getattr(settings, "NIGHT_END_HOUR", 7)      # 07:00 صباحاً
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
+
 def run_monitor_worker():
-    """عامل فحص ورصد الصفقات في الخلفية كل 15 دقيقة"""
+    """عامل فحص ورصد الصفقات في الخلفية كل 15 دقيقة مع وضع السكون الليلي الذكي"""
     interval_seconds = settings.MONITOR_INTERVAL_MINUTES * 60
     print(f"[CloudWorker] 🔄 بدء تشغيل رادار الفحص الآلي المستمر (كل {settings.MONITOR_INTERVAL_MINUTES} دقيقة)...")
+    print(f"[CloudWorker] 🌙 وضع السكون الليلي مفعل من {settings.NIGHT_START_HOUR}:00 إلى {settings.NIGHT_END_HOUR}:00 بتوقيت غزة.")
     while True:
         try:
-            print("[CloudWorker] 📡 بدء جولة فحص المتاجر في غزة...")
-            found = monitor_engine.run_monitoring_round()
-            print(f"[CloudWorker] 🎯 انتهت جولة الفحص. تم رصد {len(found)} صفقة جديدة.")
-            if found:
-                print(f"[CloudWorker] 📢 جاري بث {len(found)} صفقة للمشتركين...")
-                asyncio.run(alert_dispatcher.broadcast_all_pending_deals())
+            if is_gaza_night_time():
+                print("[CloudWorker] 🌙 فترة السكون الليلي لمتاجر غزة (المتاجر مغلقة). الرادار في وضع الراحة لتوفير موارد السيرفر.")
+            else:
+                print("[CloudWorker] 📡 بدء جولة فحص المتاجر في غزة...")
+                found = monitor_engine.run_monitoring_round()
+                print(f"[CloudWorker] 🎯 انتهت جولة الفحص. تم رصد {len(found)} صفقة جديدة.")
+                if found:
+                    print(f"[CloudWorker] 📢 جاري بث {len(found)} صفقة للمشتركين...")
+                    asyncio.run(alert_dispatcher.broadcast_all_pending_deals())
         except Exception as e:
             print(f"[CloudWorker] ⚠️ خطأ أثناء جولة الرصد: {e}")
         

@@ -22,6 +22,11 @@ class Settings:
     MONITOR_INTERVAL_MINUTES: int = int(os.getenv("MONITOR_INTERVAL_MINUTES", "15"))
     DISCOVERY_INTERVAL_HOURS: int = int(os.getenv("DISCOVERY_INTERVAL_HOURS", "6"))
 
+    # إعدادات وضع السكون الليلي (إيقاف الفحص ليلاً لحماية السيرفر والمشتركين)
+    NIGHT_MODE_ENABLED: bool = os.getenv("NIGHT_MODE_ENABLED", "true").lower() in ("true", "1", "yes")
+    NIGHT_START_HOUR: int = int(os.getenv("NIGHT_START_HOUR", "0"))  # 12:00 منتصف الليل بتوقيت غزة
+    NIGHT_END_HOUR: int = int(os.getenv("NIGHT_END_HOUR", "7"))      # 07:00 صباحاً بتوقيت غزة
+
     # نماذج الذكاء الاصطناعي
     GEMINI_MODEL: str = "gemini-flash-lite-latest"
 
