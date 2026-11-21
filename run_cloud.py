@@ -89,14 +89,10 @@ def main():
     monitor_thread = threading.Thread(target=run_monitor_worker, daemon=True)
     monitor_thread.start()
 
-    # 2. تشغيل بوت التليجرام في Thread منفصل
-    bot_thread = threading.Thread(target=run_bot_worker, daemon=True)
-    bot_thread.start()
-
-    # 3. تشغيل سيرفر لوحة تحكم الويب على المنفذ المطلوب بواسطة Render
+    # 2. تشغيل سيرفر الويب وبوت التليجرام عبر lifespan
     port = int(os.environ.get("PORT", 8000))
     host = "0.0.0.0"
-    print(f"[CloudWeb] 🌐 تشغيل لوحة تحكم الويب على المنفذ {port}...")
+    print(f"[CloudWeb] 🌐 تشغيل السيرفر السحابي والبوت على المنفذ {port}...")
     uvicorn.run(web_app, host=host, port=port)
 
 if __name__ == "__main__":

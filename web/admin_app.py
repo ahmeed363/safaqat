@@ -3,6 +3,7 @@ import sys
 import sqlite3
 import asyncio
 from typing import Optional, Dict, Any, List
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
@@ -14,7 +15,40 @@ from config.settings import settings
 from database.db_manager import db
 from telegram import Bot
 
-app = FastAPI(title="رادار صفقات غزة - لوحة تحكم الإدارة", version="1.0.0")
+tg_application_instance = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """إدارة دورة حياة السيرفر: تشغيل بوت التليجرام مباشرة داخل حلقة asyncio الرئيسية"""
+    global tg_application_instance
+    token = os.getenv("TELEGRAM_BOT_TOKEN") or settings.TELEGRAM_BOT_TOKEN
+    
+    if token:
+        try:
+            print("[Lifespan] 🤖 بدء تهيئة وتشغيل بوت التليجرام...")
+            from bot.telegram_bot import create_telegram_app
+            tg_application_instance = create_telegram_app()
+            await tg_application_instance.initialize()
+            await tg_application_instance.start()
+            await tg_application_instance.updater.start_polling(drop_pending_updates=False)
+            print("[Lifespan] 🚀 بوت التليجرام يعمل الآن ويستقبل الرسائل بنجاح!")
+        except Exception as e:
+            print(f"[Lifespan] ⚠️ تعذر تشغيل بوت التليجرام: {e}")
+            import traceback
+            traceback.print_exc()
+
+    yield
+
+    if tg_application_instance:
+        try:
+            print("[Lifespan] 🛑 إيقاف بوت التليجرام...")
+            await tg_application_instance.updater.stop()
+            await tg_application_instance.stop()
+            await tg_application_instance.shutdown()
+        except Exception as e:
+            print(f"[Lifespan] ⚠️ خطأ أثناء إيقاف البوت: {e}")
+
+app = FastAPI(title="رادار صفقات غزة - لوحة تحكم الإدارة", version="1.0.0", lifespan=lifespan)
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "dashboard.html")
 
