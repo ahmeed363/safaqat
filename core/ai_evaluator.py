@@ -14,8 +14,37 @@ def normalize_digits(text: str) -> str:
     """تحويل الأرقام المشرقية (الهندية) إلى أرقام عربية قياسية"""
     return text.translate(HINDI_TO_ARABIC)
 
+INVALID_STANDALONE_WORDS = {
+    'الكيس', 'كيس', 'أكياس', 'الباكيت', 'باكيت', 'العلبة', 'علبة',
+    'عبوات', 'عبوة', 'الكرتونة', 'كرتونة', 'الحجم', 'الكيلو', 'كيلو',
+    'حبة', 'حبات', 'قطعة', 'قطع', 'السعر', 'عروض', 'عرض', 'سعرنا',
+    'الأسعار', 'وصل', 'وصلنا', 'جديد', 'مسا الخير', 'مساء الخير', 'صباح الخير', 'التفاصيل',
+    'تخفيضات', 'بضاعة', 'متوفر', 'متوفرة', 'شيكل', 'شواكل', 'ش', 'فقط', 'الكمية'
+}
+
+def is_invalid_product_name(name: str) -> bool:
+    """فحص ما إذا كان اسم السلعة المستخرج غير مفهوم أو مجرد عبوة/وزن/سعر وليس سلعة حقيقية"""
+    if not name or len(name.strip()) < 3:
+        return True
+    norm = normalize_digits(name).replace('ـ', '').replace('ی', 'ي').strip()
+    if any(phrase in norm for phrase in ('كيلو بـ', 'الكيس بـ', 'العلبة بـ', 'سعرنا', 'الأسعار بتبدا', 'حبة فقط', 'عبوات بـ', 'مسا الخير', 'مساء الخير', 'فقط بـ', 'بـ ')):
+        return True
+    clean = re.sub(r'[\d\.\-،…!؟\(\)]+', '', norm).strip()
+    tokens = [t for t in re.split(r'\s+', clean) if t and t not in ('ب', 'في', 'من', 'و', 'فقط', 'الـ')]
+    if not tokens:
+        return True
+    if all(t in INVALID_STANDALONE_WORDS for t in tokens):
+        return True
+    return False
+
+def clean_product_title(text: str) -> str:
+    """تنظيف اسم السلعة من عبارات الدعاية والتسويق الزائدة"""
+    t = re.sub(r'[\U00010000-\U0010ffff]|[\u2600-\u27bf]', '', text).strip(' .،:-!؟')
+    t = re.sub(r'^(?:وصل حديثاً|وصلت اليوم|جددنالكم الكمية وبجودة عالية|عرض خاص|عرض|متوفر الآن|متوفرة|بشرى سارة|عروض التوفير)\s*', '', t).strip(' .،:-!؟')
+    return t
+
 def fast_rule_based_deal_parse(text: str, store_name: str = "") -> Optional[Dict[str, Any]]:
-    """مستخرج احتياطي فائق السرعة والموثوقية لقراءة العروض الصريحة والأسعار"""
+    """مستخرج احتياطي ذكي وفائق الدقة يضمن عدم استخراج أي صنف مجهول أو غير مفهوم"""
     norm = normalize_digits(text)
     pattern = r'(?:بسعر|السعر|بس|بـ|سعرها|سعر|العلبة بس|الكرتونة بس)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*(?:شيكل|شواكل|ش)'
     m = re.search(pattern, norm)
@@ -26,29 +55,43 @@ def fast_rule_based_deal_parse(text: str, store_name: str = "") -> Optional[Dict
         price = float(m.group(1))
         lines = [l.strip() for l in text.split('\n') if l.strip() and not l.strip().startswith(('#', '💳', '📍', '♦️', '📞'))]
         product = ""
-        for line in lines:
+        
+        # 1. البحث في سطر السعر والأسطر السابقة له
+        for idx, line in enumerate(lines):
             line_norm = normalize_digits(line)
             price_int_str = str(int(price)) if price.is_integer() else str(price)
             if price_int_str in line_norm and ('شيكل' in line or 'شواكل' in line or 'ش' in line):
-                clean_l = re.sub(r'[\U00010000-\U0010ffff]|[\u2600-\u27bf]', '', line).strip()
-                clean_l = re.split(r'بسعر|السعر|بس\s+\d|متوفر|متوفرة|بـ\s+\d', clean_l)[0].strip(' .،:-!')
-                if clean_l and len(clean_l) >= 4 and clean_l not in ["العبوة", "الكرتونة", "الحجم"]:
-                    product = clean_l
+                clean_l = clean_product_title(line)
+                candidate = re.split(r'بسعر|السعر|بس\s+\d|متوفر|متوفرة|بـ\s+\d', clean_l)[0].strip(' .،:-!')
+                if not is_invalid_product_name(candidate):
+                    product = candidate
                     break
-        if not product and lines:
+                # إذا كان سطر السعر يحتوي عبوة فقط (مثل: الكيس بـ 20 شيكل)، نبحث في السطور السابقة فوراً عن اسم السلعة
+                for prev_idx in range(idx - 1, -1, -1):
+                    prev_clean = clean_product_title(lines[prev_idx])
+                    if not is_invalid_product_name(prev_clean) and len(prev_clean) >= 4:
+                        product = prev_clean
+                        break
+                if product:
+                    break
+        
+        # 2. إذا لم نجد في سطر السعر، نبحث في باقي أسطر المنشور
+        if not product or is_invalid_product_name(product):
             for l in lines:
-                clean_l = re.sub(r'[\U00010000-\U0010ffff]|[\u2600-\u27bf]', '', l).strip(' .،:-!')
-                if len(clean_l) >= 5 and not clean_l.endswith('؟'):
-                    product = clean_l
+                candidate = clean_product_title(l)
+                if not is_invalid_product_name(candidate) and len(candidate) >= 4 and not candidate.endswith('؟'):
+                    product = candidate
                     break
-        if not product and lines:
-            product = re.sub(r'[\U00010000-\U0010ffff]|[\u2600-\u27bf]', '', lines[0]).strip(' .،:-!')
+
+        # إذا تعذر العثور على اسم سلعة حقيقي مفهوم، نرفض إنشاء صفقة وهمية
+        if not product or is_invalid_product_name(product):
+            return None
 
         loc_match = re.search(r'📍\s*([^\n]+)', text)
         location = loc_match.group(1).strip() if loc_match else ""
 
         deal_item = {
-            "product_name": product[:45] if product else "عرض تجاري",
+            "product_name": product[:50],
             "price": price,
             "currency": "ILS",
             "is_bargain": True,
@@ -192,49 +235,45 @@ class AIEvaluator:
 
     def parse_deal_from_text(self, post_text: str, store_name: str = "") -> Dict[str, Any]:
         """
-        استخراج كافة الصفقات والأسعار المذكورة في المنشور (يدعم تعدد الأصناف)
+        استخراج كافة الصفقات والأسعار المذكورة في المنشور بدقة متناهية بالذكاء الاصطناعي مع منع أي أصناف مبهمة
         """
         self._ensure_client()
         prompt = f"""
-        أنت وكيل ذكي خبير بأسواق غزة ومحلات التجزئة. اقرأ المنشور التالي لتاجر:
+        أنت وكيل ذكي خبير بأسواق غزة ومحلات التجزئة. اقرأ المنشور التالي لتاجر بدقة شديدة:
         اسم المتجر: {store_name}
         نص المنشور:
         {post_text}
 
-        المطلوب: استخراج **كافة الأصناف والسلع والأسعار** المذكورة في المنشور بصيغة JSON.
-        إذا ذُكر أكثر من صنف (مثلاً: سمك سلطان + سمك دنيس + كبدة)، استخرج كل صنف بشكل منفصل تماماً في قائمة deals:
+        قواعد حاسمة وإلزامية لاستخراج اسم الصنف (product_name):
+        1. يجب أن يكون اسم الصنف (product_name) واضحاً ومحدداً ومفهوماً للسلعة بذاتها (مثل: مفتول البدرساوي، أرز يونجا بسمتي، عسل أسود الرشيدي، سائل جلي، دجاج مبرد، شيبس برينجلز).
+        2. يُمنع منعاً باتاً وضع كلمات عامة، أو وحدات وزن وعبوات فقط، أو أرقام، أو نصوص الأسعار كاسم للسلعة، مثل: (الكيس، الكيلو، العلبة، 5 عبوات، 12 حبة، سعرنا 48 شيكل، كيلو بـ 8 شيكل، عرض خاص).
+        3. إذا كان السعر مكتوباً بجانب العبوة أو الوزن (مثال: 'الكيس بـ 20 شيكل' أو 'كيلو بـ 8 شيكل')، ابحث في باقي المنشور والأسطر السابقة لتعرف ما هي السلعة المعروضة بالضبط واستخرج اسمها الحقيقي (مثل: مفتول البدرساوي، أرز بسمتي).
+        4. إذا لم يكن واضحاً ما هي السلعة المحددة على الإطلاق، لا تعتبرها صفقة (has_deals: false).
+
+        المطلوب: استخراج كافة الأصناف المحددة بصيغة JSON:
         {{
             "has_deals": true,
             "deals": [
                 {{
-                    "product_name": "اسم الصنف الأول",
-                    "price": 37.0,
+                    "product_name": "اسم السلعة الحقيقي والمحدد",
+                    "price": 20.0,
                     "currency": "ILS",
                     "is_bargain": true,
                     "confidence_score": 0.95,
-                    "summary_ar": "ملخص جذاب للصنف وسعره",
-                    "location": "المكان الفعلي المذكور",
-                    "phone_contact": "رقم الهاتف إن وجد"
-                }},
-                {{
-                    "product_name": "اسم الصنف الثاني",
-                    "price": 45.0,
-                    "currency": "ILS",
-                    "is_bargain": true,
-                    "confidence_score": 0.95,
-                    "summary_ar": "ملخص جذاب للصنف وسعره",
-                    "location": "المكان الفعلي المذكور",
+                    "summary_ar": "ملخص واضح وجذاب للصنف وسعره",
+                    "location": "المكان الفعلي المذكور إن وجد",
                     "phone_contact": "رقم الهاتف إن وجد"
                 }}
             ]
         }}
-        إذا لم يتضمن المنشور بيع أو أسعار، اجعل has_deals: false وقائمة deals فارغة.
+        إذا لم يتضمن المنشور بيع أو كانت السلعة مجهولة، اجعل has_deals: false وقائمة deals فارغة.
         """
-        # محاولة الاستخراج أولاً عبر الذكاء الاصطناعي، مع استخدام المستخرج السريع كصمام أمان
-        for attempt in range(2):
+        models_to_try = [settings.GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash"]
+        # محاولة الاستخراج أولاً عبر الذكاء الاصطناعي مع التبديل التلقائي بين النماذج
+        for model_name in models_to_try:
             try:
                 response = self.client.models.generate_content(
-                    model=settings.GEMINI_MODEL,
+                    model=model_name,
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -242,37 +281,31 @@ class AIEvaluator:
                     )
                 )
                 data = json.loads(response.text)
-                if "deals" in data and data["deals"]:
+                deals_list = data.get("deals", [])
+                
+                # تصفية أي صنف رديء أو غير مفهوم
+                valid_deals = []
+                for d in deals_list:
+                    p_name = clean_product_title(d.get("product_name", ""))
+                    if not is_invalid_product_name(p_name):
+                        d["product_name"] = p_name
+                        valid_deals.append(d)
+
+                if valid_deals:
                     return {
                         "is_deal": True,
-                        "deals": data["deals"],
-                        **data["deals"][0]
+                        "deals": valid_deals,
+                        **valid_deals[0]
                     }
-                elif data.get("is_deal"):
-                    return {"is_deal": True, "deals": [data], **data}
-                
-                # إذا لم يجد الذكاء الاصطناعي صفقة، نتأكد بالمستخرج القاعدي السريع
-                rule_res = fast_rule_based_deal_parse(post_text, store_name)
-                if rule_res:
-                    return rule_res
-
-                return {"is_deal": False, "deals": []}
+                elif not deals_list:
+                    # النموذج فحص المنشور ولم يجد صفقات حقيقية
+                    return {"is_deal": False, "deals": []}
             except Exception as e:
                 err_str = str(e)
-                if ("429" in err_str or "RESOURCE_EXHAUSTED" in err_str) and attempt < 1:
-                    print(f"[AI Evaluator] ⏳ تم بلوغ الحد المؤقت للطلبات (429)، استخدام المستخرج السريع كبديل فوري...")
-                    rule_res = fast_rule_based_deal_parse(post_text, store_name)
-                    if rule_res:
-                        return rule_res
-                    time.sleep(10)
-                    continue
+                print(f"[AI Evaluator] ⚠️ تنبيه مع النموذج {model_name}: {err_str[:80]}")
+                continue
 
-                # في حال أي استثناء أو خطأ بالشبكة، المستخرج القاعدي هو خط الدفاع المضمون
-                rule_res = fast_rule_based_deal_parse(post_text, store_name)
-                if rule_res:
-                    return rule_res
-                return {"is_deal": False, "deals": [], "summary_ar": str(e)}
-
+        # خط الدفاع الأخير: المستخرج السريع مع فلتر الجودة الصارم
         rule_res = fast_rule_based_deal_parse(post_text, store_name)
         return rule_res if rule_res else {"is_deal": False, "deals": []}
 

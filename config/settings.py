@@ -28,7 +28,7 @@ class Settings:
     NIGHT_END_HOUR: int = int(os.getenv("NIGHT_END_HOUR", "7"))      # 07:00 صباحاً بتوقيت غزة
 
     # نماذج الذكاء الاصطناعي
-    GEMINI_MODEL: str = "gemini-flash-lite-latest"
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     # الكلمات المفتاحية لرصد صفقات غزة
     GAZA_KEYWORDS = [
