@@ -243,11 +243,12 @@ class DatabaseManager:
             return [dict(row) for row in cursor.fetchall()]
 
     def mark_deal_broadcasted(self, deal_id: int):
-        """تحديث حالة الصفقة بأنها بُثت للمشتركين"""
+        """تحديث حالة الصفقة بأنها بُثت للمشتركين محلياً وسحابياً"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE deals SET broadcasted_at = CURRENT_TIMESTAMP WHERE id = ?", (deal_id,))
             conn.commit()
+        _turso_sync("UPDATE deals SET broadcasted_at = CURRENT_TIMESTAMP WHERE id = ?", (deal_id,))
 
     # --- عمليات المشتركين (Subscribers) ---
 

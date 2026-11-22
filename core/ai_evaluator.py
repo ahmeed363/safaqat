@@ -24,7 +24,7 @@ INVALID_STANDALONE_WORDS = {
 }
 
 def is_invalid_product_name(name: str) -> bool:
-    """فحص ما إذا كان اسم السلعة المستخرج غير مفهوم أو مجرد عبوة/وزن/سعر وليس سلعة حقيقية"""
+    """فحص ما إذا كان اسم السلعة المستخرج غير مفهوم أو مجرد عبوة/وزن/سعر أو عبارة ترويجية وليس سلعة حقيقية"""
     if not name or len(name.strip()) < 3:
         return True
     norm = normalize_digits(name).replace('ـ', '').replace('ی', 'ي').strip()
@@ -32,8 +32,13 @@ def is_invalid_product_name(name: str) -> bool:
         'سعر الكيلو', 'سعر العلبة', 'سعر الكيس', 'سعر الحبة', 'كيلو بـ', 'الكيس بـ',
         'العلبة بـ', 'سعرنا', 'الأسعار بتبدا', 'حبة فقط', 'عبوات بـ', 'مسا الخير',
         'مساء الخير', 'فقط بـ', 'بـ ', 'شيكل فقط', 'طعم مميز', 'بأحلى الأسعار',
-        'الجودة والطزاجة', 'الطعم الحلو'
+        'الجودة والطزاجة', 'الطعم الحلو', 'إذا ريحة', 'مين بده', 'مين بدّه', 'فطوركم',
+        'ساندويش البرغر بيكمل', 'شو بتحب', 'لمسة صغيرة', 'عرووووض', 'عروووض', 'عروضنا',
+        'بضائع نخب', 'مش ضروري', 'رجع من جديد', 'أحلى مع', 'طعم أطباقكم', 'بتستاهل التجربة',
+        'بتكمّل طعم', 'إلها عنوان', 'أسعار الفواكه والخضروات', 'قسم المجمدات', 'الفرع الأول'
     )):
+        return True
+    if norm.endswith('؟') or norm.endswith('?') or any(q in norm for q in ('شو بتحب', 'مين بده', 'مين بدّه')):
         return True
     clean = re.sub(r'[\d\.\-،…!؟\(\)]+', '', norm).strip()
     tokens = [t for t in re.split(r'\s+', clean) if t and t not in ('ب', 'في', 'من', 'و', 'فقط', 'الـ')]
@@ -286,7 +291,21 @@ class AIEvaluator:
         }}
         إذا لم يتضمن المنشور بيع أو كانت السلعة مجهولة، اجعل has_deals: false وقائمة deals فارغة.
         """
-        models_to_try = [settings.GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash"]
+        models_to_try = [
+            settings.GEMINI_MODEL,
+            "gemini-3.1-flash-lite",
+            "gemini-3-flash-preview",
+            "gemini-3.5-flash",
+            "gemini-2.5-flash"
+        ]
+        # إزالة التكرار مع الحفاظ على الترتيب
+        seen_m = set()
+        unique_models = []
+        for m in models_to_try:
+            if m and m not in seen_m:
+                seen_m.add(m)
+                unique_models.append(m)
+        models_to_try = unique_models
         # محاولة الاستخراج أولاً عبر الذكاء الاصطناعي مع التبديل التلقائي بين النماذج
         for model_name in models_to_try:
             try:

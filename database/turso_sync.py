@@ -38,7 +38,7 @@ def sync_from_turso_on_boot(local_db_path: str = "safaqat.db"):
                 c.execute("""
                 INSERT INTO deals (id, store_id, product_name, price, currency, is_bargain, confidence_score, raw_post_url, media_type, summary_ar, location, phone_contact, image_url, post_time_text, creation_time, created_at, broadcasted_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET price=excluded.price, product_name=excluded.product_name, image_url=excluded.image_url;
+                ON CONFLICT(id) DO UPDATE SET price=excluded.price, product_name=excluded.product_name, image_url=excluded.image_url, broadcasted_at=COALESCE(deals.broadcasted_at, excluded.broadcasted_at);
                 """, [d.get("id"), d.get("store_id"), d.get("product_name"), d.get("price"), d.get("currency"), d.get("is_bargain"), d.get("confidence_score"), d.get("raw_post_url"), d.get("media_type"), d.get("summary_ar"), d.get("location"), d.get("phone_contact"), d.get("image_url"), d.get("post_time_text"), d.get("creation_time"), d.get("created_at"), d.get("broadcasted_at")])
             print(f"[TursoSync] • تم استيراد {len(deals)} صفقة من السحابة.")
         except Exception as e:

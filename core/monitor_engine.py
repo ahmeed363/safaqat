@@ -77,13 +77,15 @@ class MonitorEngine:
             post_time_text = post.get("post_time_text", "")
             ctime = post.get("creation_time")
 
-            # سياسة نضارة العروض: تخطي المنشورات القديمة جداً (أكثر من 48 ساعة)
+            # سياسة نضارة العروض: تخطي المنشورات القديمة (أكثر من 24 ساعة)
             # لتفادي بث عروض منتهية أو قديمة كمفاجأة جديدة للمشتركين
             if ctime:
                 age_seconds = time.time() - ctime
-                if age_seconds > 48 * 3600:
-                    print(f"[Monitor] ⏳ تم تخطي منشور قديم ({post_time_text or 'أكثر من 48 ساعة'}): {caption[:40]}...")
+                if age_seconds > 24 * 3600:
+                    print(f"[Monitor] ⏳ تم تخطي منشور قديم ({post_time_text or 'أكثر من 24 ساعة'}): {caption[:40]}...")
                     continue
+            if post_time_text and any(old_w in post_time_text for old_w in ("قبل يومين", "أيام", "نُشر بتاريخ")):
+                continue
 
             deal_data = None
             audio_path = None
@@ -156,8 +158,8 @@ class MonitorEngine:
         db.update_store_checked_time(store_id)
         return new_deals
 
-    def run_monitoring_round(self) -> List[Dict[str, Any]]:
-        """تشغيل جولة فحص على كافة المتاجر المعتمدة"""
+    def run_monitoring_round(self, on_deals_callback: Optional[Any] = None) -> List[Dict[str, Any]]:
+        """تشغيل جولة فحص على كافة المتاجر المعتمدة مع إمكانية البث الفوري"""
         stores = db.get_all_stores(verified_only=True)
         print(f"[Monitor] 🚀 بدء جولة الفحص على {len(stores)} متجر معتمد في غزة...")
         all_found_deals = []
@@ -165,7 +167,13 @@ class MonitorEngine:
         for store in stores:
             try:
                 deals = self.check_store_for_new_deals(store)
-                all_found_deals.extend(deals)
+                if deals:
+                    all_found_deals.extend(deals)
+                    if on_deals_callback:
+                        try:
+                            on_deals_callback(deals)
+                        except Exception as cb_err:
+                            print(f"[Monitor] ⚠️ خطأ في معالج البث الفوري: {cb_err}")
             except Exception as e:
                 print(f"[Monitor] ⚠️ خطأ أثناء فحص المتجر {store['name']}: {e}")
 

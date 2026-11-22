@@ -45,11 +45,14 @@ def run_monitor_worker():
                 print("[CloudWorker] 🌙 فترة السكون الليلي لمتاجر غزة (المتاجر مغلقة). الرادار في وضع الراحة لتوفير موارد السيرفر.")
             else:
                 print("[CloudWorker] 📡 بدء جولة فحص المتاجر في غزة...")
-                found = monitor_engine.run_monitoring_round()
-                print(f"[CloudWorker] 🎯 انتهت جولة الفحص. تم رصد {len(found)} صفقة جديدة.")
-                if found:
-                    print(f"[CloudWorker] 📢 جاري بث {len(found)} صفقة للمشتركين...")
+                def on_store_deals_found(deals):
+                    print(f"[CloudWorker] ⚡ بث فوري لـ {len(deals)} صفقة رُصدت للتو...")
                     asyncio.run(alert_dispatcher.broadcast_all_pending_deals())
+
+                found = monitor_engine.run_monitoring_round(on_deals_callback=on_store_deals_found)
+                print(f"[CloudWorker] 🎯 انتهت جولة الفحص. إجمالي ما تم رصده في هذه الجولة: {len(found)} صفقة.")
+                # تأكيد نهائي لبث أي صفقات معلقة
+                asyncio.run(alert_dispatcher.broadcast_all_pending_deals())
         except Exception as e:
             print(f"[CloudWorker] ⚠️ خطأ أثناء جولة الرصد: {e}")
         
