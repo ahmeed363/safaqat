@@ -229,6 +229,15 @@ class DatabaseManager:
             except sqlite3.IntegrityError:
                 return None  # الصفقة مسجلة مسبقاً
 
+    def is_post_deal_exists(self, post_url: str) -> bool:
+        """التحقق مما إذا كان المنشور مسجلاً مسبقاً في جدول الصفقات لتفادي إعادة استدعاء الذكاء الاصطناعي"""
+        if not post_url:
+            return False
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM deals WHERE raw_post_url LIKE ? LIMIT 1", (f"{post_url}%",))
+            return cursor.fetchone() is not None
+
     def get_unbroadcasted_deals(self) -> List[Dict[str, Any]]:
         """جلب الصفقات التي لم يتم بثها للمشتركين بعد"""
         with self.get_connection() as conn:

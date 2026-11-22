@@ -1,4 +1,5 @@
 import time
+import re
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from config.settings import settings
@@ -58,9 +59,17 @@ def format_post_timestamp(ctime: Optional[int]) -> str:
     except Exception:
         return ""
 
+DEAL_SIGNALS = re.compile(r'(\d+|[٠-٩]+)\s*(?:شيكل|شواكل|ش|دولار|\$)|(?:سعر|عروض|عرض|تخفيض|تخفيضات|حرق|بسعر|لقطة|خصم|متوفر|وصل|بـ\s*\d|دينار|كيلو|كيس)', re.IGNORECASE)
+
+def might_contain_deal(text: str) -> bool:
+    """فحص أولي سريع: هل يحتوي النص على أي مؤشر عرض أو سعر قبل استهلاك كوتة الذكاء الاصطناعي؟"""
+    if not text or len(text.strip()) < 8:
+        return False
+    return bool(DEAL_SIGNALS.search(text))
+
 class MonitorEngine:
     def __init__(self):
-        pass
+        self.scanned_posts_cache = set()
 
     def check_store_for_new_deals(self, store: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -84,15 +93,35 @@ class MonitorEngine:
             post_time_text = post.get("post_time_text", "")
             ctime = post.get("creation_time")
 
-            # سياسة نضارة العروض: تخطي المنشورات القديمة (أكثر من 24 ساعة)
+            # 1. التحقق من التكرار لحماية كوتة الذكاء الاصطناعي بنسبة 100%:
+            # إذا كان المنشور مسجلاً في جدول الصفقات أو تم فحصه في هذه الجلسة، نتخطاه فوراً
+            if post_url:
+                if post_url in self.scanned_posts_cache or db.is_post_deal_exists(post_url):
+                    continue
+
+            # 2. سياسة نضارة العروض: تخطي المنشورات القديمة (أكثر من 24 ساعة)
             # لتفادي بث عروض منتهية أو قديمة كمفاجأة جديدة للمشتركين
             if ctime:
                 age_seconds = time.time() - ctime
                 if age_seconds > 24 * 3600:
                     print(f"[Monitor] ⏳ تم تخطي منشور قديم ({post_time_text or 'أكثر من 24 ساعة'}): {caption[:40]}...")
+                    if post_url:
+                        self.scanned_posts_cache.add(post_url)
                     continue
             if post_time_text and any(old_w in post_time_text for old_w in ("قبل يومين", "أيام", "نُشر بتاريخ")):
+                if post_url:
+                    self.scanned_posts_cache.add(post_url)
                 continue
+
+            # 3. فلترة المنشورات العامة التي لا تحتوي على أي مؤشرات أسعار (أدعية، تهاني، مواعيد عمل)
+            if media_type != "video" and not might_contain_deal(caption):
+                if post_url:
+                    self.scanned_posts_cache.add(post_url)
+                continue
+
+            # تسجيل الرابط في الكاش لمنع إعادة فحصه
+            if post_url:
+                self.scanned_posts_cache.add(post_url)
 
             deal_data = None
             audio_path = None
