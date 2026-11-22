@@ -398,15 +398,20 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="text-xs font-bold text-slate-300 block mb-1">المنطقة الجغرافية:</label>
-                        <select id="add-store-area" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
-                            <option value="مدينة غزة">مدينة غزة</option>
-                            <option value="دير البلح">دير البلح</option>
-                            <option value="المحافظة الوسطى">المحافظة الوسطى / النصيرات</option>
-                            <option value="خانيونس">خانيونس</option>
-                            <option value="رفح والمواصي">رفح والمواصي</option>
-                            <option value="شمال غزة">شمال غزة</option>
-                        </select>
+                        <label class="text-xs font-bold text-slate-300 block mb-1">الموقع أو العنوان التفصيلي:</label>
+                        <input type="text" id="add-store-area" list="gaza-areas-list" placeholder="مثال: خانيونس - البلد أو دير البلح شارع السلام" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <datalist id="gaza-areas-list">
+                            <option value="مدينة غزة - الرمال">
+                            <option value="مدينة غزة - تل الهوا">
+                            <option value="دير البلح - شارع السلام">
+                            <option value="دير البلح - البلد">
+                            <option value="المحافظة الوسطى - النصيرات">
+                            <option value="المحافظة الوسطى - البريج">
+                            <option value="خانيونس - البلد">
+                            <option value="مواصي خانيونس">
+                            <option value="رفح - البلد">
+                            <option value="شمال غزة - جباليا">
+                        </datalist>
                     </div>
                     <div>
                         <label class="text-xs font-bold text-slate-300 block mb-1">التصنيف:</label>
@@ -704,14 +709,19 @@
         }
         function closeAddStoreModal() {
             document.getElementById('add-store-modal').classList.add('hidden');
+            document.getElementById('add-store-url').value = '';
+            document.getElementById('add-store-name').value = '';
+            document.getElementById('add-store-area').value = '';
+            document.getElementById('add-store-category').value = '';
+            document.getElementById('add-store-phone').value = '';
         }
 
         async function saveNewStore() {
             const data = {
                 url: document.getElementById('add-store-url').value.trim(),
                 name: document.getElementById('add-store-name').value.trim(),
-                city_area: document.getElementById('add-store-area').value,
-                category: document.getElementById('add-store-category').value.trim(),
+                city_area: document.getElementById('add-store-area').value.trim() || "مدينة غزة",
+                category: document.getElementById('add-store-category').value.trim() || "تموين وسوبرماركت",
                 phone: document.getElementById('add-store-phone').value.trim()
             };
             if (!data.url || !data.name) {
