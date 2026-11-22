@@ -16,10 +16,11 @@ def normalize_digits(text: str) -> str:
 
 INVALID_STANDALONE_WORDS = {
     'الكيس', 'كيس', 'أكياس', 'الباكيت', 'باكيت', 'العلبة', 'علبة',
-    'عبوات', 'عبوة', 'الكرتونة', 'كرتونة', 'الحجم', 'الكيلو', 'كيلو',
-    'حبة', 'حبات', 'قطعة', 'قطع', 'السعر', 'عروض', 'عرض', 'سعرنا',
+    'عبوات', 'عبوة', 'الكرتونة', 'كرتونة', 'الحجم', 'الكيلو', 'كيلو', 'كيلوجرام',
+    'حبة', 'حبات', 'قطعة', 'قطع', 'السعر', 'سعر', 'أسعار', 'عروض', 'عرض', 'سعرنا',
     'الأسعار', 'وصل', 'وصلنا', 'جديد', 'مسا الخير', 'مساء الخير', 'صباح الخير', 'التفاصيل',
-    'تخفيضات', 'بضاعة', 'متوفر', 'متوفرة', 'شيكل', 'شواكل', 'ش', 'فقط', 'الكمية'
+    'تخفيضات', 'بضاعة', 'متوفر', 'متوفرة', 'شيكل', 'شواكل', 'ش', 'فقط', 'الكمية', 'كميات',
+    'موجود', 'موجودة', 'طعم', 'مميز', 'جودة', 'بتستاهل', 'الجودة', 'الطزاجة', 'الطعم', 'الحلو'
 }
 
 def is_invalid_product_name(name: str) -> bool:
@@ -27,7 +28,12 @@ def is_invalid_product_name(name: str) -> bool:
     if not name or len(name.strip()) < 3:
         return True
     norm = normalize_digits(name).replace('ـ', '').replace('ی', 'ي').strip()
-    if any(phrase in norm for phrase in ('كيلو بـ', 'الكيس بـ', 'العلبة بـ', 'سعرنا', 'الأسعار بتبدا', 'حبة فقط', 'عبوات بـ', 'مسا الخير', 'مساء الخير', 'فقط بـ', 'بـ ')):
+    if any(phrase in norm for phrase in (
+        'سعر الكيلو', 'سعر العلبة', 'سعر الكيس', 'سعر الحبة', 'كيلو بـ', 'الكيس بـ',
+        'العلبة بـ', 'سعرنا', 'الأسعار بتبدا', 'حبة فقط', 'عبوات بـ', 'مسا الخير',
+        'مساء الخير', 'فقط بـ', 'بـ ', 'شيكل فقط', 'طعم مميز', 'بأحلى الأسعار',
+        'الجودة والطزاجة', 'الطعم الحلو'
+    )):
         return True
     clean = re.sub(r'[\d\.\-،…!؟\(\)]+', '', norm).strip()
     tokens = [t for t in re.split(r'\s+', clean) if t and t not in ('ب', 'في', 'من', 'و', 'فقط', 'الـ')]
@@ -37,75 +43,87 @@ def is_invalid_product_name(name: str) -> bool:
         return True
     return False
 
-def clean_product_title(text: str) -> str:
-    """تنظيف اسم السلعة من عبارات الدعاية والتسويق الزائدة"""
+def clean_product_title(text: str, store_name: str = "") -> str:
+    """تنظيف اسم السلعة من عبارات الدعاية والتسويق واسم المتجر"""
     t = re.sub(r'[\U00010000-\U0010ffff]|[\u2600-\u27bf]', '', text).strip(' .،:-!؟')
-    t = re.sub(r'^(?:وصل حديثاً|وصلت اليوم|جددنالكم الكمية وبجودة عالية|عرض خاص|عرض|متوفر الآن|متوفرة|بشرى سارة|عروض التوفير)\s*', '', t).strip(' .،:-!؟')
+    t = re.sub(r'^(?:وصل حديثاً|وصلت اليوم|جددنالكم الكمية وبجودة عالية|عرض خاص|عرض|متوفر الآن|متوفرة|بشرى سارة|عروض التوفير|طعم مميز وجودة بتستاهل|الجودة والطزاجة بأحلى الأسعار)\s*', '', t).strip(' .،:-!؟')
+    if store_name:
+        clean_store = re.sub(r'[|].*', '', store_name).strip()
+        t = re.sub(r'\s*(?:من|داخل|في|لدى)\s+' + re.escape(clean_store) + r'.*', '', t, flags=re.IGNORECASE).strip(' .،:-!؟')
+    t = re.sub(r'\s*(?:من|داخل|في|لدى)\s+(?:مول|سوبرماركت|مركز|هايبر|ماركت)\s+[\w\s]+', '', t).strip(' .،:-!؟')
     return t
 
 def fast_rule_based_deal_parse(text: str, store_name: str = "") -> Optional[Dict[str, Any]]:
-    """مستخرج احتياطي ذكي وفائق الدقة يضمن عدم استخراج أي صنف مجهول أو غير مفهوم"""
+    """مستخرج احتياطي ذكي وفائق الدقة يضمن استخراج اسم السلعة الحقيقي حصراً"""
     norm = normalize_digits(text)
-    pattern = r'(?:بسعر|السعر|بس|بـ|سعرها|سعر|العلبة بس|الكرتونة بس)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*(?:شيكل|شواكل|ش)'
+    pattern = r'(?:بسعر|السعر|سعر الكيلو|سعر|بس|بـ)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*(?:شيكل|شواكل|ش|فقط)'
     m = re.search(pattern, norm)
     if not m:
         m = re.search(r'(\d+(?:\.\d+)?)\s*(?:شيكل|شواكل)', norm)
     
-    if m:
-        price = float(m.group(1))
-        lines = [l.strip() for l in text.split('\n') if l.strip() and not l.strip().startswith(('#', '💳', '📍', '♦️', '📞'))]
-        product = ""
-        
-        # 1. البحث في سطر السعر والأسطر السابقة له
+    if not m:
+        return None
+
+    price = float(m.group(1))
+    lines = [l.strip() for l in text.split('\n') if l.strip() and not l.strip().startswith(('#', '💳', '📍', '♦️', '📞', '🛒'))]
+    if not lines:
+        return None
+
+    product = ""
+    # الأولوية 1: فحص السطر الأول للمنشور (أغلب المحلات تضع اسم السلعة كعنوان في السطر الأول)
+    first_clean = clean_product_title(lines[0], store_name)
+    if not is_invalid_product_name(first_clean) and len(first_clean) >= 3:
+        product = first_clean
+
+    # الأولوية 2: إذا لم نجد في السطر الأول، نبحث في سطر السعر والأسطر السابقة له
+    if not product:
         for idx, line in enumerate(lines):
             line_norm = normalize_digits(line)
             price_int_str = str(int(price)) if price.is_integer() else str(price)
             if price_int_str in line_norm and ('شيكل' in line or 'شواكل' in line or 'ش' in line):
-                clean_l = clean_product_title(line)
-                candidate = re.split(r'بسعر|السعر|بس\s+\d|متوفر|متوفرة|بـ\s+\d', clean_l)[0].strip(' .،:-!')
+                clean_l = clean_product_title(line, store_name)
+                candidate = re.split(r'سعر الكيلو|بسعر|السعر|بس\s+\d|متوفر|متوفرة|بـ\s+\d', clean_l)[0].strip(' .،:-!')
                 if not is_invalid_product_name(candidate):
                     product = candidate
                     break
-                # إذا كان سطر السعر يحتوي عبوة فقط (مثل: الكيس بـ 20 شيكل)، نبحث في السطور السابقة فوراً عن اسم السلعة
                 for prev_idx in range(idx - 1, -1, -1):
-                    prev_clean = clean_product_title(lines[prev_idx])
-                    if not is_invalid_product_name(prev_clean) and len(prev_clean) >= 4:
+                    prev_clean = clean_product_title(lines[prev_idx], store_name)
+                    if not is_invalid_product_name(prev_clean) and len(prev_clean) >= 3:
                         product = prev_clean
                         break
                 if product:
                     break
-        
-        # 2. إذا لم نجد في سطر السعر، نبحث في باقي أسطر المنشور
-        if not product or is_invalid_product_name(product):
-            for l in lines:
-                candidate = clean_product_title(l)
-                if not is_invalid_product_name(candidate) and len(candidate) >= 4 and not candidate.endswith('؟'):
-                    product = candidate
-                    break
 
-        # إذا تعذر العثور على اسم سلعة حقيقي مفهوم، نرفض إنشاء صفقة وهمية
-        if not product or is_invalid_product_name(product):
-            return None
+    # الأولوية 3: البحث في باقي الأسطر
+    if not product or is_invalid_product_name(product):
+        for l in lines:
+            candidate = clean_product_title(l, store_name)
+            if not is_invalid_product_name(candidate) and len(candidate) >= 3 and not candidate.endswith('؟'):
+                product = candidate
+                break
 
-        loc_match = re.search(r'📍\s*([^\n]+)', text)
-        location = loc_match.group(1).strip() if loc_match else ""
+    # إذا تعذر العثور على اسم سلعة حقيقي مفهوم، نرفض إنشاء صفقة وهمية
+    if not product or is_invalid_product_name(product):
+        return None
 
-        deal_item = {
-            "product_name": product[:50],
-            "price": price,
-            "currency": "ILS",
-            "is_bargain": True,
-            "confidence_score": 0.95,
-            "summary_ar": f"عرض {product} بسعر {price} شيكل في {store_name}",
-            "location": location,
-            "phone_contact": ""
-        }
-        return {
-            "is_deal": True,
-            "deals": [deal_item],
-            **deal_item
-        }
-    return None
+    loc_match = re.search(r'📍\s*([^\n]+)', text)
+    location = loc_match.group(1).strip() if loc_match else ""
+
+    deal_item = {
+        "product_name": product[:50],
+        "price": price,
+        "currency": "ILS",
+        "is_bargain": True,
+        "confidence_score": 0.95,
+        "summary_ar": f"عرض {product} بسعر {price} شيكل في {store_name}",
+        "location": location,
+        "phone_contact": ""
+    }
+    return {
+        "is_deal": True,
+        "deals": [deal_item],
+        **deal_item
+    }
 
 class AIEvaluator:
     def __init__(self, api_key: Optional[str] = None):

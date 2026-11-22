@@ -112,6 +112,12 @@ class MonitorEngine:
                         if not item.get("is_bargain", True):
                             continue
                         
+                        p_name = item.get("product_name", "").strip()
+                        from core.ai_evaluator import is_invalid_product_name
+                        if is_invalid_product_name(p_name):
+                            print(f"[Monitor] 🛑 تم حجب وإلغاء صفقة مبهمة غير صريحة: '{p_name}'")
+                            continue
+
                         unique_url = f"{post_url}#{item.get('product_name')[:20]}" if post_url else f"{store_url}/posts/{int(time.time())}_{item.get('product_name')[:10]}"
                         final_time_text = post_time_text or item.get("post_time_text", "")
                         
