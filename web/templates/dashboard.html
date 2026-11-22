@@ -158,6 +158,10 @@
                         <option value="خانيونس">خانيونس</option>
                         <option value="رفح">رفح والمواصي</option>
                     </select>
+                    <button onclick="openCustomTestModal()" class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-2 transition shadow-sm whitespace-nowrap">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        تجربة صفقة جديدة
+                    </button>
                     <button onclick="loadDeals()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 transition">
                         <i class="fa-solid fa-rotate-right"></i>
                         تحديث
@@ -324,6 +328,45 @@
                     <i class="fa-solid fa-check"></i>
                     حفظ التعديلات
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM TEST DEAL MODAL -->
+    <div id="custom-test-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h3 class="font-bold text-white flex items-center gap-2 text-base">
+                    <i class="fa-solid fa-paper-plane text-sky-400"></i>
+                    إرسال صفقة تجريبية مخصصة لتليجرام
+                </h3>
+                <button onclick="closeCustomTestModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-400">اكتب اسم أي سلعة وسعر لتجربة وصول البطاقة فوراً على بوت تليجرام ومعاينتها:</p>
+            <div class="space-y-3 text-right">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">اسم السلعة / المنتج:</label>
+                    <input type="text" id="test-prod-name" placeholder="مثال: سكر أبيض 50 كجم كيس كامل" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">السعر (شيكل):</label>
+                    <input type="number" step="0.5" id="test-prod-price" placeholder="مثال: 180" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">اسم المتجر / السوبرماركت:</label>
+                    <input type="text" id="test-prod-store" placeholder="مثال: مركز طلال عواد التجاري" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">الموقع / العنوان:</label>
+                    <input type="text" id="test-prod-loc" placeholder="مثال: دير البلح - شارع السلام" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+            </div>
+            <div class="flex gap-2 pt-2 border-t border-slate-700/80">
+                <button onclick="submitCustomTestDeal()" id="btn-submit-test-deal" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>إرسال للتليجرام الآن</span>
+                </button>
+                <button onclick="closeCustomTestModal()" class="px-4 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs transition font-semibold">إلغاء</button>
             </div>
         </div>
     </div>
@@ -561,6 +604,10 @@
                         <td class="p-4 text-xs text-slate-400">${d.post_time_text || 'اليوم'}</td>
                         <td class="p-4 text-center">
                             <div class="inline-flex items-center gap-2">
+                                <button onclick="sendTestDeal(${d.id})" class="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition flex items-center gap-1.5" title="إرسال تجربة فورية لهذا العرض إلى تليجرام">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                    <span>تجربة تليجرام</span>
+                                </button>
                                 <button onclick="openEditModal(${d.id})" class="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs transition" title="تعديل">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
@@ -632,6 +679,74 @@
                 }
             } catch (e) {
                 alert("خطأ: " + e.message);
+            }
+        }
+
+        // Test Deal Broadcasting
+        async function sendTestDeal(dealId) {
+            if (!confirm('هل تريد إرسال بطاقة هذا العرض مباشرة كتجربة إلى محادثة تليجرام؟')) return;
+            try {
+                const res = await fetch(`/api/deals/${dealId}/test_send`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message || 'تم إرسال بطاقة التجربة بنجاح إلى تليجرام! 🚀');
+                } else {
+                    alert('تعذر الإرسال: ' + (data.detail || 'خطأ غير متوقع'));
+                }
+            } catch (e) {
+                alert('خطأ في الاتصال: ' + e.message);
+            }
+        }
+
+        function openCustomTestModal() {
+            document.getElementById('custom-test-modal').classList.remove('hidden');
+            document.getElementById('test-prod-name').focus();
+        }
+
+        function closeCustomTestModal() {
+            document.getElementById('custom-test-modal').classList.add('hidden');
+        }
+
+        async function submitCustomTestDeal() {
+            const name = document.getElementById('test-prod-name').value.trim();
+            const price = parseFloat(document.getElementById('test-prod-price').value);
+            const store = document.getElementById('test-prod-store').value.trim() || "متجر تجريبي";
+            const loc = document.getElementById('test-prod-loc').value.trim() || "قطاع غزة";
+
+            if (!name || isNaN(price)) {
+                alert('يرجى إدخال اسم السلعة والسعر بشكل صحيح.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-submit-test-deal');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> جاري الإرسال...';
+
+            try {
+                const res = await fetch('/api/deals/test_custom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_name: name,
+                        price: price,
+                        store_name: store,
+                        location: loc
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message || 'تم إرسال التجربة بنجاح إلى تليجرام! 🚀');
+                    closeCustomTestModal();
+                    document.getElementById('test-prod-name').value = '';
+                    document.getElementById('test-prod-price').value = '';
+                } else {
+                    alert('تعذر الإرسال: ' + (data.detail || 'خطأ'));
+                }
+            } catch (e) {
+                alert('خطأ: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> <span>إرسال للتليجرام الآن</span>';
             }
         }
 

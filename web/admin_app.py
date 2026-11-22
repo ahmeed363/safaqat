@@ -68,6 +68,14 @@ class DealUpdatePayload(BaseModel):
     summary_ar: Optional[str] = ""
     location: Optional[str] = ""
 
+class CustomTestDealPayload(BaseModel):
+    product_name: str
+    price: float
+    store_name: Optional[str] = "متجر تجريبي"
+    location: Optional[str] = "قطاع غزة"
+    summary_ar: Optional[str] = ""
+    currency: Optional[str] = "ILS"
+
 class StoreCreatePayload(BaseModel):
     url: str
     name: str
@@ -159,6 +167,95 @@ async def delete_deal_endpoint(deal_id: int):
     if not success:
         raise HTTPException(status_code=404, detail="الصفقة غير موجودة")
     return {"status": "ok", "message": "تم حذف الصفقة بنجاح"}
+
+@app.post("/api/deals/{deal_id}/test_send")
+async def test_send_deal_endpoint(deal_id: int):
+    """إرسال بطاقة صفقة محددة مباشرة إلى تليجرام الإدارة كتجربة عمل"""
+    token = settings.TELEGRAM_BOT_TOKEN
+    admin_id = settings.ADMIN_TELEGRAM_ID
+    if not token or not admin_id:
+        raise HTTPException(status_code=500, detail="إعدادات التليجرام غير مكتملة")
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT d.*, s.name as store_name, s.url as store_url 
+        FROM deals d 
+        LEFT JOIN stores s ON d.store_id = s.id 
+        WHERE d.id = ?
+        """, (deal_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="الصفقة غير موجودة")
+        deal = dict(row)
+
+    from bot.telegram_bot import render_deal_card
+    card_text = "🧪 **[معاينة بطاقة عرض - تجربة لوحة التحكم]**\n\n" + render_deal_card(deal, is_admin=True, is_broadcast=True, compact=False)
+    
+    from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton
+    async with Bot(token=token) as bot:
+        reply_markup = InlineKeyboardMarkup([[
+            InlineKeyboardButton("👁️ فتح تفاصيل العرض", callback_data=f"deal_expand:{deal_id}")
+        ]])
+        try:
+            await bot.send_message(
+                chat_id=str(admin_id),
+                text=card_text,
+                parse_mode="Markdown",
+                protect_content=True,
+                reply_markup=reply_markup
+            )
+        except Exception:
+            await bot.send_message(
+                chat_id=str(admin_id),
+                text=card_text.replace("*", "").replace("`", ""),
+                protect_content=True,
+                reply_markup=reply_markup
+            )
+
+    return {"status": "ok", "message": f"تم إرسال بطاقة ({deal['product_name']}) بنجاح إلى تليجرام الإدارة! 🚀"}
+
+@app.post("/api/deals/test_custom")
+async def test_custom_deal_endpoint(payload: CustomTestDealPayload):
+    """إرسال بطاقة تجريبية مخصصة بالسلعة والسعر المحددين إلى تليجرام الإدارة"""
+    token = settings.TELEGRAM_BOT_TOKEN
+    admin_id = settings.ADMIN_TELEGRAM_ID
+    if not token or not admin_id:
+        raise HTTPException(status_code=500, detail="إعدادات التليجرام غير مكتملة")
+
+    fake_deal = {
+        "id": 999999,
+        "product_name": payload.product_name,
+        "price": payload.price,
+        "currency": payload.currency or "ILS",
+        "store_name": payload.store_name or "متجر تجريبي",
+        "location": payload.location or "قطاع غزة",
+        "summary_ar": payload.summary_ar or f"عرض تجريبي لـ {payload.product_name} بسعر {payload.price} {payload.currency or 'ILS'}",
+        "post_time_text": "الآن مباشرة ⚡",
+        "raw_post_url": "https://facebook.com",
+        "phone_contact": "0590000000"
+    }
+
+    from bot.telegram_bot import render_deal_card
+    card_text = "🧪 **[إرسال تجريبي مخصص من لوحة التحكم]**\n\n" + render_deal_card(fake_deal, is_admin=True, is_broadcast=True, compact=False)
+    
+    from telegram import Bot
+    async with Bot(token=token) as bot:
+        try:
+            await bot.send_message(
+                chat_id=str(admin_id),
+                text=card_text,
+                parse_mode="Markdown",
+                protect_content=True
+            )
+        except Exception:
+            await bot.send_message(
+                chat_id=str(admin_id),
+                text=card_text.replace("*", "").replace("`", ""),
+                protect_content=True
+            )
+
+    return {"status": "ok", "message": f"تم إرسال التجربة لـ ({payload.product_name}) بنجاح إلى تليجرام الإدارة! 🚀"}
 
 @app.get("/api/stores")
 async def get_stores():

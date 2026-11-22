@@ -18,6 +18,15 @@ class AlertDispatcher:
             print("[Dispatcher] ⚠️ لم يتم ضبط TELEGRAM_BOT_TOKEN. تم تخطي البث.")
             return 0
 
+        # حارس بوابة الجودة: منع بث أي صفقة تحمل اسماً غير صالح أو عبارة ترويجية مبهمة
+        prod_name = str(deal.get("product_name") or "").strip()
+        from core.ai_evaluator import is_invalid_product_name
+        if is_invalid_product_name(prod_name):
+            print(f"[Dispatcher] 🛑 تم حجب وإلغاء بث صفقة مبهمة: '{prod_name}'")
+            if deal.get("id"):
+                db.mark_deal_broadcasted(deal["id"])
+            return 0
+
         async def _send_with_bot(active_bot: Bot) -> int:
             subscribers = db.get_active_subscribers()
             sent_count = 0

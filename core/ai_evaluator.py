@@ -33,10 +33,15 @@ def is_invalid_product_name(name: str) -> bool:
         'العلبة بـ', 'سعرنا', 'الأسعار بتبدا', 'حبة فقط', 'عبوات بـ', 'مسا الخير',
         'مساء الخير', 'فقط بـ', 'بـ ', 'شيكل فقط', 'طعم مميز', 'بأحلى الأسعار',
         'الجودة والطزاجة', 'الطعم الحلو', 'إذا ريحة', 'مين بده', 'مين بدّه', 'فطوركم',
-        'ساندويش البرغر بيكمل', 'شو بتحب', 'لمسة صغيرة', 'عرووووض', 'عروووض', 'عروضنا',
+        'ساندويش البرغر بيكمل', 'شو بتحب', 'لمسة صغيرة', 'عرووووض', 'عروووض', 'عروضنا', 'عروض',
         'بضائع نخب', 'مش ضروري', 'رجع من جديد', 'أحلى مع', 'طعم أطباقكم', 'بتستاهل التجربة',
-        'بتكمّل طعم', 'إلها عنوان', 'أسعار الفواكه والخضروات', 'قسم المجمدات', 'الفرع الأول'
+        'بتكمّل طعم', 'إلها عنوان', 'أسعار الفواكه والخضروات', 'قسم المجمدات', 'الفرع الأول',
+        'المجنونة', 'المجنونه', 'حصرية وقوية', 'حصرية', 'نخب النخب', 'محرقة', 'تخفيضات',
+        'بشرى سارة', 'حرق الأسعار', 'لا تفوتكم', 'أسعارنا', 'وصل حديثاً', 'وصلت اليوم', 'وصل اليوم',
+        'قسم المنظفات', 'قسم اللحوم', 'قسم الأجبان', 'قسم الخضار', 'أقوى العروض'
     )):
+        return True
+    if any(norm.startswith(p) for p in ('عرض ', 'عروض ', 'عرووض ', 'عرووووض ', 'قسم ', 'أقوى ')):
         return True
     if norm.endswith('؟') or norm.endswith('?') or any(q in norm for q in ('شو بتحب', 'مين بده', 'مين بدّه')):
         return True
@@ -75,29 +80,30 @@ def fast_rule_based_deal_parse(text: str, store_name: str = "") -> Optional[Dict
         return None
 
     product = ""
-    # الأولوية 1: فحص السطر الأول للمنشور (أغلب المحلات تضع اسم السلعة كعنوان في السطر الأول)
-    first_clean = clean_product_title(lines[0], store_name)
-    if not is_invalid_product_name(first_clean) and len(first_clean) >= 3:
-        product = first_clean
+    # الأولوية 1: فحص سطر السعر نفسه (السلعة تذكر دائماً قبل السعر مباشرة: كبدة خروف مبردة بسعر 33 ش)
+    for idx, line in enumerate(lines):
+        line_norm = normalize_digits(line)
+        price_int_str = str(int(price)) if price.is_integer() else str(price)
+        if price_int_str in line_norm and any(w in line_norm for w in ('شيكل', 'شواكل', 'ش', 'سعر', 'بسعر', 'بـ')):
+            clean_l = clean_product_title(line, store_name)
+            candidate = re.split(r'سعر الكيلو|سعر العلبة|سعر الكيس|بسعر|السعر|بس\s+\d|متوفر|متوفرة|بـ\s*\d|ب\s*\d', clean_l)[0].strip(' .،:-!')
+            if not is_invalid_product_name(candidate) and len(candidate) >= 3:
+                product = candidate
+                break
+            # إذا كان سطر السعر مجرد عبوة/سعر (مثل: "سعر الكيلو 6 شيكل")، نبحث في السطر الذي يسبقه مباشرة
+            for prev_idx in range(idx - 1, -1, -1):
+                prev_clean = clean_product_title(lines[prev_idx], store_name)
+                if not is_invalid_product_name(prev_clean) and len(prev_clean) >= 3:
+                    product = prev_clean
+                    break
+            if product:
+                break
 
-    # الأولوية 2: إذا لم نجد في السطر الأول، نبحث في سطر السعر والأسطر السابقة له
-    if not product:
-        for idx, line in enumerate(lines):
-            line_norm = normalize_digits(line)
-            price_int_str = str(int(price)) if price.is_integer() else str(price)
-            if price_int_str in line_norm and ('شيكل' in line or 'شواكل' in line or 'ش' in line):
-                clean_l = clean_product_title(line, store_name)
-                candidate = re.split(r'سعر الكيلو|بسعر|السعر|بس\s+\d|متوفر|متوفرة|بـ\s+\d', clean_l)[0].strip(' .،:-!')
-                if not is_invalid_product_name(candidate):
-                    product = candidate
-                    break
-                for prev_idx in range(idx - 1, -1, -1):
-                    prev_clean = clean_product_title(lines[prev_idx], store_name)
-                    if not is_invalid_product_name(prev_clean) and len(prev_clean) >= 3:
-                        product = prev_clean
-                        break
-                if product:
-                    break
+    # الأولوية 2: فحص السطر الأول فقط إذا لم يكن عنواناً ترويجياً ولم نجد في سطر السعر
+    if not product or is_invalid_product_name(product):
+        first_clean = clean_product_title(lines[0], store_name)
+        if not is_invalid_product_name(first_clean) and len(first_clean) >= 3:
+            product = first_clean
 
     # الأولوية 3: البحث في باقي الأسطر
     if not product or is_invalid_product_name(product):
