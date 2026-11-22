@@ -28,9 +28,15 @@ def format_deal_time(created_at_val) -> str:
         diff = now_utc - dt_utc
         total_seconds = max(0, diff.total_seconds())
 
-        # التوقيت المحلي لغزة (UTC+2)
-        local_dt = dt_utc + timedelta(hours=2)
-        local_now = now_utc + timedelta(hours=2)
+        # التوقيت المحلي لقطاع غزة (Asia/Gaza)
+        try:
+            from zoneinfo import ZoneInfo
+            gaza_tz = ZoneInfo("Asia/Gaza")
+            local_dt = dt_utc.astimezone(gaza_tz)
+            local_now = now_utc.astimezone(gaza_tz)
+        except Exception:
+            local_dt = dt_utc + timedelta(hours=2)
+            local_now = now_utc + timedelta(hours=2)
 
         hour_str = local_dt.strftime("%I:%M").lstrip("0")
         am_pm = "م" if local_dt.hour >= 12 else "ص"
@@ -83,7 +89,12 @@ def render_deal_card(deal: dict, is_admin: bool = False, is_broadcast: bool = Fa
     price_formatted = format_price(deal.get("price", 0), deal.get("currency", "ILS"))
     store = deal.get("store_name") or "أحد المتاجر في غزة"
     location = deal.get("location") or "قطاع غزة"
-    time_str = deal.get("post_time_text") or format_deal_time(deal.get("created_at"))
+    ctime = deal.get("creation_time")
+    if ctime and int(ctime) > 0:
+        from core.monitor_engine import format_post_timestamp
+        time_str = format_post_timestamp(int(ctime))
+    else:
+        time_str = deal.get("post_time_text") or format_deal_time(deal.get("created_at"))
     summary = deal.get("summary_ar", "").strip()
     phone = str(deal.get("phone_contact") or "").strip()
     if phone in ["None", "غير متوفر", "لا يوجد"]:

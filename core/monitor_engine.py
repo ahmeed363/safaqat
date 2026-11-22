@@ -7,12 +7,19 @@ from core.media_processor import media_processor
 from core.ai_evaluator import ai_evaluator
 
 def format_post_timestamp(ctime: Optional[int]) -> str:
-    """تحويل طابع الوقت الفعلي لفيسبوك (creation_time) إلى نص عربي دقيق جداً"""
+    """تحويل طابع الوقت الفعلي لفيسبوك (creation_time) إلى توقيت قطاع غزة المحلي الدقيق (Asia/Gaza)"""
     if not ctime:
         return ""
     try:
-        dt = datetime.fromtimestamp(ctime)
-        now = datetime.now()
+        try:
+            from zoneinfo import ZoneInfo
+            gaza_tz = ZoneInfo("Asia/Gaza")
+        except Exception:
+            from datetime import timezone, timedelta
+            gaza_tz = timezone(timedelta(hours=2))
+
+        dt = datetime.fromtimestamp(ctime, tz=gaza_tz)
+        now = datetime.now(gaza_tz)
         diff = now - dt
         diff_seconds = diff.total_seconds()
 
@@ -25,7 +32,7 @@ def format_post_timestamp(ctime: Optional[int]) -> str:
             if diff_seconds < 60:
                 rel = "الآن مباشرة ⚡"
             elif diff_seconds < 3600:
-                mins = int(diff_seconds // 60)
+                mins = max(1, int(diff_seconds // 60))
                 rel = f"قبل {mins} دقيقة ⚡"
             elif diff_seconds < 7200:
                 rel = "قبل ساعة واحدة"
