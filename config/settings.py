@@ -15,7 +15,7 @@ class Settings:
     # مفاتيح الربط البرمجي
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    TELEGRAM_BROADCAST_CHAT_ID: str = os.getenv("TELEGRAM_BROADCAST_CHAT_ID", "")
+    TELEGRAM_BROADCAST_CHAT_ID: str = os.getenv("TELEGRAM_BROADCAST_CHAT_ID", "@gaza_safaqat")
     ADMIN_TELEGRAM_ID: str = os.getenv("ADMIN_TELEGRAM_ID", "6854086264")
 
     # إعدادات فترات العمل الآلي
