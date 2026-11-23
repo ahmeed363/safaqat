@@ -130,11 +130,14 @@
             </button>
             <button onclick="switchTab('stores')" id="tab-btn-stores" class="tab-btn pb-4 px-2 text-sm font-bold flex items-center gap-2 text-slate-300 hover:text-white transition">
                 <i class="fa-solid fa-shop"></i>
-                المتاجر المعتمدة (88)
+                <span>المتاجر المعتمدة</span>
+                <span id="tab-stores-count" class="px-2 py-0.5 rounded-full text-xs bg-slate-800 text-slate-300 border border-slate-700 font-bold">...</span>
             </button>
-            <button onclick="switchTab('subscribers')" id="tab-btn-subscribers" class="tab-btn pb-4 px-2 text-sm font-bold flex items-center gap-2 text-slate-300 hover:text-white transition">
+            <button onclick="switchTab('subscribers')" id="tab-btn-subscribers" class="tab-btn pb-4 px-2 text-sm font-bold flex items-center gap-2 text-slate-300 hover:text-white transition relative">
                 <i class="fa-solid fa-user-group"></i>
-                المشتركون والاشتراكات
+                <span>المشتركون</span>
+                <span id="tab-subscribers-count" class="px-2 py-0.5 rounded-full text-xs bg-slate-800 text-slate-300 border border-slate-700 font-bold">0</span>
+                <span id="tab-subscribers-new-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-400 border border-rose-500/50 font-black animate-pulse">0 جديد 🔥</span>
             </button>
             <button onclick="switchTab('broadcast')" id="tab-btn-broadcast" class="tab-btn pb-4 px-2 text-sm font-bold flex items-center gap-2 text-slate-300 hover:text-white transition">
                 <i class="fa-solid fa-bullhorn"></i>
@@ -236,6 +239,30 @@
 
         <!-- TAB 3: SUBSCRIBERS MANAGEMENT -->
         <section id="tab-subscribers" class="space-y-6 hidden">
+            <div class="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
+                <div class="flex items-center gap-3">
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-users text-emerald-400"></i>
+                        <span>إجمالي المشتركين:</span>
+                        <span id="subs-header-count" class="text-emerald-400 font-extrabold text-lg">0</span>
+                    </h3>
+                    <span id="subs-header-new-alert" class="hidden px-2.5 py-1 rounded-full text-xs bg-rose-500/20 text-rose-400 border border-rose-500/40 font-bold flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                        <span id="subs-header-new-count">0</span> مشترك جديد
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="markAllSubscribersSeen()" class="px-3.5 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold flex items-center gap-2 transition" title="إزالة وسم 'جديد' عن كافة المشتركين">
+                        <i class="fa-solid fa-check-double text-emerald-400"></i>
+                        تحديد الكل كمشاهد
+                    </button>
+                    <button onclick="loadSubscribers()" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 transition">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        تحديث
+                    </button>
+                </div>
+            </div>
+
             <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl overflow-hidden shadow-sm">
                 <div class="overflow-x-auto">
                     <table class="w-full text-right text-sm">
@@ -555,6 +582,12 @@
                 document.getElementById('stat-today-deals').innerText = data.today_deals || 0;
                 document.getElementById('stat-total-deals').innerText = data.total_deals || 0;
                 document.getElementById('stat-img-deals').innerText = data.deals_with_images || 0;
+                if (document.getElementById('tab-subscribers-count')) {
+                    document.getElementById('tab-subscribers-count').innerText = data.total_subs || 0;
+                }
+                if (document.getElementById('tab-stores-count')) {
+                    document.getElementById('tab-stores-count').innerText = data.verified_stores || 0;
+                }
             } catch (e) {
                 console.error("Error loading stats:", e);
             }
@@ -909,37 +942,122 @@
         }
 
         // Load Subscribers
+        function getSeenSubIds() {
+            try {
+                const stored = localStorage.getItem('safaqat_seen_sub_ids');
+                return stored ? JSON.parse(stored) : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function setSeenSubId(subId) {
+            const seen = new Set(getSeenSubIds());
+            seen.add(subId);
+            localStorage.setItem('safaqat_seen_sub_ids', JSON.stringify([...seen]));
+            renderSubscribers();
+        }
+
+        function markAllSubscribersSeen() {
+            if (!allSubs || allSubs.length === 0) return;
+            const allIds = allSubs.map(s => s.id);
+            localStorage.setItem('safaqat_seen_sub_ids', JSON.stringify(allIds));
+            renderSubscribers();
+        }
+
+        function renderSubscribers() {
+            const tbody = document.getElementById('subs-table-body');
+            const seenSet = new Set(getSeenSubIds());
+            const count = allSubs.length;
+
+            if (document.getElementById('tab-subscribers-count')) {
+                document.getElementById('tab-subscribers-count').innerText = count;
+            }
+            if (document.getElementById('subs-header-count')) {
+                document.getElementById('subs-header-count').innerText = count;
+            }
+
+            const newSubs = allSubs.filter(s => !seenSet.has(s.id));
+            const newCount = newSubs.length;
+
+            const tabBadge = document.getElementById('tab-subscribers-new-badge');
+            const headerAlert = document.getElementById('subs-header-new-alert');
+            const headerNewCount = document.getElementById('subs-header-new-count');
+
+            if (newCount > 0) {
+                if (tabBadge) {
+                    tabBadge.innerText = `${newCount} جديد 🔥`;
+                    tabBadge.classList.remove('hidden');
+                }
+                if (headerAlert && headerNewCount) {
+                    headerNewCount.innerText = newCount;
+                    headerAlert.classList.remove('hidden');
+                }
+            } else {
+                if (tabBadge) tabBadge.classList.add('hidden');
+                if (headerAlert) headerAlert.classList.add('hidden');
+            }
+
+            if (allSubs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-slate-500">لا يوجد مشتركون مسجلون بعد.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = allSubs.map(s => {
+                const isNew = !seenSet.has(s.id);
+                const newBadge = isNew
+                    ? `<span onclick="setSeenSubId(${s.id})" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-400 border border-rose-500/50 animate-pulse cursor-pointer hover:bg-rose-500 hover:text-white transition shadow-sm" title="مشترك جديد! اضغط هنا لإزالة كلمة جديد">
+                           <i class="fa-solid fa-sparkles text-amber-400"></i> جديد
+                       </span>`
+                    : '';
+
+                const statusBadge = s.subscription_status === 'trial'
+                    ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">تجريبي مجاني</span>`
+                    : `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">اشتراك مفعل</span>`;
+
+                return `
+                <tr class="hover:bg-slate-800/40 transition ${isNew ? 'bg-rose-500/5' : ''}">
+                    <td class="p-4">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-white">${s.full_name || 'صديق صفقات'}</span>
+                            ${newBadge}
+                        </div>
+                    </td>
+                    <td class="p-4 text-xs text-sky-400">${s.username ? '@' + s.username : '-'}</td>
+                    <td class="p-4 text-xs font-mono text-slate-400">${s.telegram_chat_id}</td>
+                    <td class="p-4">${statusBadge}</td>
+                    <td class="p-4 text-xs text-slate-300 font-mono">${s.trial_ends_at || '-'}</td>
+                    <td class="p-4 text-center">
+                        <div class="inline-flex items-center gap-2">
+                            <button onclick="extendSub('${s.telegram_chat_id}', 7)" class="px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition">
+                                +7 أيام مجانية
+                            </button>
+                            <button onclick="activateSub('${s.telegram_chat_id}')" class="px-3 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white text-xs font-bold transition">
+                                تفعيل دائم ✅
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+        }
+
         async function loadSubscribers() {
             const tbody = document.getElementById('subs-table-body');
             try {
                 const res = await fetch('/api/subscribers');
                 allSubs = await res.json();
+                renderSubscribers();
 
-                tbody.innerHTML = allSubs.map(s => {
-                    const statusBadge = s.subscription_status === 'trial'
-                        ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">تجريبي مجاني</span>`
-                        : `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">اشتراك مفعل</span>`;
-
-                    return `
-                    <tr class="hover:bg-slate-800/40 transition">
-                        <td class="p-4 font-bold text-white">${s.full_name || 'صديق صفقات'}</td>
-                        <td class="p-4 text-xs text-sky-400">${s.username ? '@' + s.username : '-'}</td>
-                        <td class="p-4 text-xs font-mono text-slate-400">${s.telegram_chat_id}</td>
-                        <td class="p-4">${statusBadge}</td>
-                        <td class="p-4 text-xs text-slate-300 font-mono">${s.trial_ends_at || '-'}</td>
-                        <td class="p-4 text-center">
-                            <div class="inline-flex items-center gap-2">
-                                <button onclick="extendSub('${s.telegram_chat_id}', 7)" class="px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-xs font-bold transition">
-                                    +7 أيام مجانية
-                                </button>
-                                <button onclick="activateSub('${s.telegram_chat_id}')" class="px-3 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white text-xs font-bold transition">
-                                    تفعيل دائم ✅
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    `;
-                }).join('');
+                // عند فتح الصفحة، إذا رغب في تعليمهم تلقائياً كمقروء بعد 4 ثوانٍ من المعاينة
+                const seenSet = new Set(getSeenSubIds());
+                const hasNew = allSubs.some(s => !seenSet.has(s.id));
+                if (hasNew) {
+                    clearTimeout(window.subscribersViewTimer);
+                    window.subscribersViewTimer = setTimeout(() => {
+                        markAllSubscribersSeen();
+                    }, 4000);
+                }
             } catch (e) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-rose-400">خطأ: ${e.message}</td></tr>`;
             }
@@ -1004,6 +1122,25 @@
         window.addEventListener('DOMContentLoaded', () => {
             loadStats();
             loadDeals();
+            // Pre-fetch subscribers to update tab counts and new badge immediately
+            fetch('/api/subscribers').then(r => r.json()).then(data => {
+                allSubs = data || [];
+                const seenSet = new Set(getSeenSubIds());
+                const count = allSubs.length;
+                if (document.getElementById('tab-subscribers-count')) {
+                    document.getElementById('tab-subscribers-count').innerText = count;
+                }
+                const newCount = allSubs.filter(s => !seenSet.has(s.id)).length;
+                const tabBadge = document.getElementById('tab-subscribers-new-badge');
+                if (tabBadge) {
+                    if (newCount > 0) {
+                        tabBadge.innerText = `${newCount} جديد 🔥`;
+                        tabBadge.classList.remove('hidden');
+                    } else {
+                        tabBadge.classList.add('hidden');
+                    }
+                }
+            }).catch(e => console.error(e));
         });
     </script>
 </body>
