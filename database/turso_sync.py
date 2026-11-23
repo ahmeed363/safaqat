@@ -49,10 +49,14 @@ def sync_from_turso_on_boot(local_db_path: str = "safaqat.db"):
             subs = turso.query("SELECT * FROM subscribers;")
             for sub in subs:
                 c.execute("""
-                INSERT INTO subscribers (id, telegram_chat_id, username, full_name, category_preference, area_preference, subscription_status, trial_ends_at, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET subscription_status=excluded.subscription_status, trial_ends_at=excluded.trial_ends_at;
-                """, [sub.get("id"), sub.get("telegram_chat_id"), sub.get("username"), sub.get("full_name"), sub.get("category_preference"), sub.get("area_preference"), sub.get("subscription_status"), sub.get("trial_ends_at"), sub.get("created_at")])
+                INSERT INTO subscribers (telegram_chat_id, username, full_name, category_preference, area_preference, subscription_status, trial_ends_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(telegram_chat_id) DO UPDATE SET 
+                    username=excluded.username,
+                    full_name=excluded.full_name,
+                    subscription_status=excluded.subscription_status, 
+                    trial_ends_at=excluded.trial_ends_at;
+                """, [sub.get("telegram_chat_id"), sub.get("username"), sub.get("full_name"), sub.get("category_preference"), sub.get("area_preference"), sub.get("subscription_status"), sub.get("trial_ends_at"), sub.get("created_at")])
             print(f"[TursoSync] • تم استيراد {len(subs)} مشترك من السحابة.")
         except Exception as e:
             print(f"[TursoSync] subscribers sync note: {e}")

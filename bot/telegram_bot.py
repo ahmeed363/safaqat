@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime, timezone, timedelta
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, TypeHandler
 from config.settings import settings
 from database.db_manager import db
 
@@ -1007,13 +1007,48 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(help_text, parse_mode="Markdown")
 
+_known_subscribers = set()
+
+def auto_ensure_subscriber(update: Update):
+    """التحقق التلقائي من تسجيل المشترك ومزامنته سحابياً مع Turso فور أي تفاعل"""
+    user = update.effective_user
+    if not user or user.is_bot:
+        return
+    uid = str(user.id)
+    if uid not in _known_subscribers:
+        try:
+            db.register_subscriber(
+                chat_id=uid,
+                username=user.username or "",
+                full_name=user.full_name or "صديق صفقات"
+            )
+            _known_subscribers.add(uid)
+            logging.info(f"[AutoRegister] تم تسجيل ومزامنة المشترك سحابياً: {uid} ({user.full_name})")
+        except Exception as e:
+            logging.warning(f"[AutoRegister] تعذر تسجيل المشترك {uid}: {e}")
+
+async def global_user_tracker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """راصد شامل لجميع التفاعلات (أزرار، رسائل، أوامر) يضمن حفظ واستعادة المشتركين آلياً"""
+    auto_ensure_subscriber(update)
+
 def create_telegram_app() -> Application:
     """تهيئة تطبيق التليجرام"""
     token = settings.TELEGRAM_BOT_TOKEN
     if not token:
         raise ValueError("TELEGRAM_BOT_TOKEN غير مضبوط في .env")
 
+    # تحميل معرفات المشتركين المسجلين في الذاكرة السريعة لتفادي الاستعلامات المتكررة
+    try:
+        with db.get_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT telegram_chat_id FROM subscribers")
+            global _known_subscribers
+            _known_subscribers = {str(row[0]) for row in c.fetchall()}
+    except Exception as e:
+        logging.warning(f"[BotInit] تعذر قراءة المشتركين المسبقين: {e}")
+
     application = Application.builder().token(token).build()
+    application.add_handler(TypeHandler(Update, global_user_tracker), group=-1)
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("stores", stores_command))

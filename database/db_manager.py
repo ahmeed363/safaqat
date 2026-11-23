@@ -262,9 +262,10 @@ class DatabaseManager:
     # --- عمليات المشتركين (Subscribers) ---
 
     def register_subscriber(self, chat_id: str, username: str = "", full_name: str = "") -> Dict[str, Any]:
-        """تسجيل مشترك جديد وإعطاؤه أسبوع تجربة مجانية"""
+        """تسجيل مشترك جديد وإعطاؤه أسبوع تجربة مجانية مع مزامنة سحابية دائمة"""
         trial_period_days = 7
         trial_end = datetime.now() + timedelta(days=trial_period_days)
+        trial_str = trial_end.strftime("%Y-%m-%d %H:%M:%S")
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -273,11 +274,22 @@ class DatabaseManager:
             ON CONFLICT(telegram_chat_id) DO UPDATE SET
                 username=excluded.username,
                 full_name=excluded.full_name
-            """, (str(chat_id), username, full_name, trial_end.strftime("%Y-%m-%d %H:%M:%S")))
+            """, (str(chat_id), username, full_name, trial_str))
             conn.commit()
 
             cursor.execute("SELECT * FROM subscribers WHERE telegram_chat_id = ?", (str(chat_id),))
-            return dict(cursor.fetchone())
+            res = dict(cursor.fetchone())
+
+        # مزامنة المشترك سحابياً مع Turso لمنع فقدانه نهائياً عند إعادة تشغيل السيرفر
+        _turso_sync("""
+        INSERT INTO subscribers (telegram_chat_id, username, full_name, trial_ends_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(telegram_chat_id) DO UPDATE SET
+            username=excluded.username,
+            full_name=excluded.full_name
+        """, (str(chat_id), username, full_name, trial_str))
+
+        return res
 
     def get_active_subscribers(self) -> List[Dict[str, Any]]:
         """جلب المشتركين النشطين (سواء في فترة التجربة أو اشتراك مفعل)"""
