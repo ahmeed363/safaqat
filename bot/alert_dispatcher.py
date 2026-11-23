@@ -66,28 +66,41 @@ class AlertDispatcher:
                     except Exception as ex2:
                         print(f"[Dispatcher] فشل الإرسال للمشترك {chat_id}: {ex2}")
 
-            # إذا كانت هناك قناة عامة للتسويق
+            # إذا كانت هناك قناة عامة للتسويق (نرسل نسخة طعم تسويقية بدون اسم المتجر ورقم الهاتف)
             if settings.TELEGRAM_BROADCAST_CHAT_ID:
                 prod_name = deal.get("product_name", "سلعة جديدة")
                 prod_price = deal.get("price", "")
                 prod_curr = deal.get("currency", "ILS")
                 prod_loc = deal.get("location", "قطاع غزة")
+                post_time = deal.get("post_time_text", "اليوم")
                 teaser_text = (
-                    f"⚡ **رصد جديد من رادار صفقات غزة** ⚡\n\n"
-                    f"🛒 **السلعة:** {prod_name}\n"
-                    f"💰 **السعر:** {prod_price} {prod_curr} *(سعر حرق)*\n"
-                    f"📍 **الموقع:** {prod_loc}\n\n"
-                    f"🔒 *تم إرسال رقم التاجر والتفاصيل كاملة وفيديو العرض للمشتركين في البوت الخاص.*\n"
-                    f"👉 للاشتراك وتصلك الصفقات في ثوانٍ: تواصل مع البوت فوراً."
+                    f"⚡ **صيد جديد رصده الرادار في أسواق غزة** ⚡\n\n"
+                    f"🛍️ **السلعة:** {prod_name}\n"
+                    f"🔥 **السعر:** {prod_price} {prod_curr} *(سعر حرق)*\n"
+                    f"📍 **المنطقة:** {prod_loc}\n"
+                    f"⏰ **التوقيت:** {post_time}\n\n"
+                    f"🔒 **تنبيه:** اسم المتجر ورقم هاتف التاجر ورابط العرض الأصلي محجوبة ومخصصة للمشتركين في البوت الخاص.\n\n"
+                    f"👇 اضغط على الزر أدناه لمعرفة تفاصيل المتجر ورقم التاجر فوراً:"
                 )
+                channel_btn = InlineKeyboardMarkup([[
+                    InlineKeyboardButton("⚡ كشف تفاصيل المتجر والتاجر في البوت", url="https://t.me/gaza_safaqat_bot?start=channel_teaser")
+                ]])
                 try:
                     await active_bot.send_message(
                         chat_id=settings.TELEGRAM_BROADCAST_CHAT_ID,
                         text=teaser_text,
-                        parse_mode="Markdown"
+                        parse_mode="Markdown",
+                        reply_markup=channel_btn
                     )
                 except Exception as e:
-                    print(f"[Dispatcher] فشل الإرسال للقناة العامة: {e}")
+                    try:
+                        await active_bot.send_message(
+                            chat_id=settings.TELEGRAM_BROADCAST_CHAT_ID,
+                            text=teaser_text.replace("*", "").replace("`", ""),
+                            reply_markup=channel_btn
+                        )
+                    except Exception as ex2:
+                        print(f"[Dispatcher] فشل الإرسال للقناة العامة: {ex2}")
 
             # تعليم الصفقة بأنها بُثت في القاعدة المحلية والسحابية
             if deal_id:
