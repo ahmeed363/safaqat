@@ -18,6 +18,11 @@ class Settings:
     TELEGRAM_BROADCAST_CHAT_ID: str = os.getenv("TELEGRAM_BROADCAST_CHAT_ID", "@gaza_safaqat")
     ADMIN_TELEGRAM_ID: str = os.getenv("ADMIN_TELEGRAM_ID", "6854086264")
 
+    # إعدادات حماية وتسجيل الدخول للوحة التحكم
+    ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "admin")
+    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "safaqat2026")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "safaqat-secure-admin-session-key-2026")
+
     # إعدادات فترات العمل الآلي
     MONITOR_INTERVAL_MINUTES: int = int(os.getenv("MONITOR_INTERVAL_MINUTES", "15"))
     DISCOVERY_INTERVAL_HOURS: int = int(os.getenv("DISCOVERY_INTERVAL_HOURS", "6"))

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول | لوحة تحكم رادار صفقات غزة ⚡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            900: '#064e3b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+        .bg-mesh {
+            background-color: #0b1120;
+            background-image: 
+                radial-gradient(at 15% 20%, rgba(16, 185, 129, 0.12) 0px, transparent 50%),
+                radial-gradient(at 85% 80%, rgba(14, 165, 233, 0.10) 0px, transparent 50%);
+        }
+    </style>
+</head>
+<body class="bg-mesh text-slate-100 min-h-screen flex items-center justify-center p-4 selection:bg-emerald-500 selection:text-white">
+
+    <div class="w-full max-w-md">
+
+        <!-- Header Card / Logo -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-white shadow-xl shadow-emerald-500/25 mb-4 ring-4 ring-emerald-500/10 animate-bounce duration-1000">
+                <i class="fa-solid fa-bolt text-3xl"></i>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+                رادار صفقات غزة
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-400 mt-2 font-medium">
+                بوابة الدخول إلى لوحة التحكم والإدارة المركزية
+            </p>
+        </div>
+
+        <!-- Login Box -->
+        <div class="bg-slate-800/80 backdrop-blur-xl border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-slate-950/50">
+            
+            <!-- Security Badge -->
+            <div class="mb-6 p-3 rounded-2xl bg-slate-900/60 border border-slate-700/60 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-base shrink-0">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="text-xs text-slate-300">
+                    <p class="font-bold text-white">منطقة إدارية مشفرة 🔒</p>
+                    <p class="text-slate-400 text-[11px]">يرجى إدخال بيانات اعتماد المسؤول للمتابعة</p>
+                </div>
+            </div>
+
+            <!-- Error Banner -->
+            <div id="error-box" class="hidden mb-5 p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold flex items-center gap-2.5 transition duration-300">
+                <i class="fa-solid fa-triangle-exclamation text-base shrink-0"></i>
+                <span id="error-message">اسم المستخدم أو كلمة المرور غير صحيحة</span>
+            </div>
+
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                <!-- Username -->
+                <div>
+                    <label for="username" class="block text-xs font-bold text-slate-300 mb-1.5 mr-1">
+                        اسم المستخدم:
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-user text-sm"></i>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            required 
+                            autocomplete="username"
+                            placeholder="أدخل اسم المستخدم..."
+                            class="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-3 pr-10 pl-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition font-medium"
+                        >
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label for="password" class="block text-xs font-bold text-slate-300 mb-1.5 mr-1">
+                        كلمة المرور:
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-lock text-sm"></i>
+                        </div>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required 
+                            autocomplete="current-password"
+                            placeholder="••••••••"
+                            class="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-3 pr-10 pl-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition font-medium"
+                        >
+                        <button 
+                            type="button" 
+                            onclick="togglePasswordVisibility()" 
+                            class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 hover:text-slate-200 transition"
+                            title="إظهار / إخفاء كلمة المرور"
+                        >
+                            <i id="toggle-eye" class="fa-solid fa-eye text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Remember Me -->
+                <div class="flex items-center justify-between pt-1">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input 
+                            type="checkbox" 
+                            id="remember" 
+                            name="remember" 
+                            checked
+                            class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 cursor-pointer accent-emerald-500"
+                        >
+                        <span class="text-xs text-slate-400 hover:text-slate-300 font-medium">تذكر تسجيل الدخول (30 يوماً)</span>
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-2">
+                    <button 
+                        type="submit" 
+                        id="submit-btn"
+                        class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 hover:shadow-emerald-500/40 transition duration-200 flex items-center justify-center gap-2 active:scale-[0.99]"
+                    >
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                        <span>تسجيل الدخول للوحة</span>
+                    </button>
+                </div>
+            </form>
+
+        </div>
+
+        <!-- Footer Notice -->
+        <div class="text-center mt-6 text-xs text-slate-500">
+            <p>منظومة صفقات غزة الذكية ⚡ 2026 - مشفرة بتقنية HMAC-SHA256</p>
+        </div>
+
+    </div>
+
+    <script>
+        function togglePasswordVisibility() {
+            const pwdInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('toggle-eye');
+            if (pwdInput.type === 'password') {
+                pwdInput.type = 'text';
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+            } else {
+                pwdInput.type = 'password';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const rememberInput = document.getElementById('remember');
+            const submitBtn = document.getElementById('submit-btn');
+            const errorBox = document.getElementById('error-box');
+            const errorMessage = document.getElementById('error-message');
+
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            const remember = rememberInput.checked;
+
+            if (!username || !password) {
+                errorBox.classList.remove('hidden');
+                errorMessage.textContent = 'يرجى إدخال اسم المستخدم وكلمة المرور';
+                return;
+            }
+
+            // UI loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-base"></i><span>جاري التحقق والدخول...</span>';
+            errorBox.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, remember })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'ok') {
+                    submitBtn.classList.remove('from-emerald-600', 'to-teal-500');
+                    submitBtn.classList.add('from-green-600', 'to-emerald-500');
+                    submitBtn.innerHTML = '<i class="fa-solid fa-check text-base"></i><span>تم الدخول بنجاح! جاري التحويل...</span>';
+                    setTimeout(() => {
+                        window.location.href = data.redirect || '/';
+                    }, 400);
+                } else {
+                    errorBox.classList.remove('hidden');
+                    errorMessage.textContent = data.message || 'اسم المستخدم أو كلمة المرور غير صحيحة';
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i><span>تسجيل الدخول للوحة</span>';
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                }
+            } catch (err) {
+                console.error(err);
+                errorBox.classList.remove('hidden');
+                errorMessage.textContent = 'تعذر الاتصال بالسيرفر. تأكد من اتصال الإنترنت وحاول مجدداً.';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i><span>تسجيل الدخول للوحة</span>';
+            }
+        }
+    </script>
+</body>
+</html>

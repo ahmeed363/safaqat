@@ -55,8 +55,8 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-4">
-                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950/60 border border-slate-700 text-xs text-slate-300">
+            <div class="flex items-center gap-3">
+                <span class="hidden md:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950/60 border border-slate-700 text-xs text-slate-300">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     محرك الرصد الذاتي: <strong class="text-emerald-400">نشط</strong>
                 </span>
@@ -64,6 +64,10 @@
                     <i class="fa-brands fa-telegram text-sm"></i>
                     فتح البوت
                 </a>
+                <button onclick="logoutAdmin()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer" title="تسجيل الخروج من لوحة التحكم">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    <span>تسجيل الخروج</span>
+                </button>
             </div>
         </div>
     </header>
@@ -552,6 +556,26 @@
 
     <!-- JAVASCRIPT LOGIC -->
     <script>
+        // Global Fetch Interceptor to redirect on 401 Unauthorized
+        const _nativeFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const resp = await _nativeFetch(...args);
+            if (resp.status === 401) {
+                window.location.href = '/login';
+            }
+            return resp;
+        };
+
+        // Logout
+        async function logoutAdmin() {
+            if (confirm('هل أنت متأكد من رغبتك في تسجيل الخروج من لوحة التحكم؟')) {
+                try {
+                    await _nativeFetch('/api/logout', { method: 'POST' });
+                } catch (e) {}
+                window.location.href = '/login';
+            }
+        }
+
         // State
         let allDeals = [];
         let allStores = [];

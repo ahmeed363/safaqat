@@ -2,10 +2,13 @@ import os
 import sys
 import sqlite3
 import asyncio
+import hmac
+import hashlib
+import time
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query, Body
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query, Body, Request, Response, Depends
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 # Add root directory to path
@@ -59,8 +62,65 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="رادار صفقات غزة - لوحة تحكم الإدارة", version="1.0.0", lifespan=lifespan)
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "dashboard.html")
+LOGIN_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "login.html")
+SESSION_COOKIE_NAME = "safaqat_admin_session"
+
+# --- Authentication Helpers ---
+
+def create_session_token(username: str, duration_seconds: int = 7 * 86400) -> str:
+    """توليد رمز جلسة موقع مشفر بتقنية HMAC-SHA256"""
+    expires_at = int(time.time() + duration_seconds)
+    payload = f"{username}:{expires_at}"
+    secret = getattr(settings, "SECRET_KEY", "safaqat-secure-admin-session-key-2026")
+    sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}:{sig}"
+
+def verify_session_token(token: Optional[str]) -> bool:
+    """التحقق من صحة وصلاحية رمز الجلسة"""
+    if not token:
+        return False
+    try:
+        parts = token.split(":")
+        if len(parts) != 3:
+            return False
+        username, exp_str, sig = parts
+        if int(exp_str) < time.time():
+            return False
+        secret = getattr(settings, "SECRET_KEY", "safaqat-secure-admin-session-key-2026")
+        expected_sig = hmac.new(secret.encode(), f"{username}:{exp_str}".encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected_sig, sig):
+            return False
+        expected_user = getattr(settings, "ADMIN_USERNAME", "admin")
+        return hmac.compare_digest(username, expected_user)
+    except Exception:
+        return False
+
+def is_authenticated(request: Request) -> bool:
+    """فحص ما إذا كان المستخدم مسجل الدخول حالياً"""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    return verify_session_token(token)
+
+async def require_admin(request: Request) -> bool:
+    """حاجز أمني لمنع أي طلبات API غير مصرح بها"""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token and "Authorization" in request.headers:
+        auth_header = request.headers["Authorization"]
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+
+    if not verify_session_token(token):
+        raise HTTPException(
+            status_code=401, 
+            detail="جلسة العمل غير صالحة أو منتهية. يرجى تسجيل الدخول أولاً."
+        )
+    return True
 
 # --- Schemas ---
+
+class LoginPayload(BaseModel):
+    username: str
+    password: str
+    remember: Optional[bool] = True
 
 class DealUpdatePayload(BaseModel):
     product_name: str
@@ -95,9 +155,72 @@ class BroadcastPayload(BaseModel):
 
 # --- Web Endpoints ---
 
+@app.get("/login", response_class=HTMLResponse)
+async def serve_login(request: Request):
+    """عرض صفحة تسجيل الدخول إلى لوحة التحكم"""
+    if is_authenticated(request):
+        return RedirectResponse(url="/", status_code=302)
+    if not os.path.exists(LOGIN_TEMPLATE_PATH):
+        raise HTTPException(status_code=404, detail="Login template not found")
+    with open(LOGIN_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content)
+
+@app.post("/api/login")
+async def login_endpoint(payload: LoginPayload):
+    """التحقق من بيانات الدخول وتعيين كوكيز الجلسة المشفر"""
+    admin_user = getattr(settings, "ADMIN_USERNAME", "admin")
+    admin_pass = getattr(settings, "ADMIN_PASSWORD", "safaqat2026")
+
+    is_user_ok = hmac.compare_digest(payload.username.strip(), admin_user)
+    is_pass_ok = hmac.compare_digest(payload.password, admin_pass)
+
+    if not (is_user_ok and is_pass_ok):
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": "اسم المستخدم أو كلمة المرور غير صحيحة"}
+        )
+
+    # 30 يوماً إذا تم تفعيل 'تذكرني'، وإلا 7 أيام
+    duration = (30 if payload.remember else 7) * 86400
+    token = create_session_token(admin_user, duration)
+
+    resp = JSONResponse(
+        status_code=200,
+        content={"status": "ok", "message": "تم تسجيل الدخول بنجاح", "redirect": "/"}
+    )
+    resp.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        max_age=duration,
+        httponly=True,
+        samesite="lax",
+        path="/"
+    )
+    return resp
+
+@app.get("/logout")
+async def logout_get():
+    """تسجيل الخروج وإعادة التوجيه لصفحة الدخول"""
+    resp = RedirectResponse(url="/login", status_code=302)
+    resp.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
+    return resp
+
+@app.post("/api/logout")
+async def logout_post():
+    """تسجيل الخروج عبر طلب API"""
+    resp = JSONResponse(
+        status_code=200,
+        content={"status": "ok", "message": "تم تسجيل الخروج بنجاح", "redirect": "/login"}
+    )
+    resp.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
+    return resp
+
 @app.get("/", response_class=HTMLResponse)
-async def serve_dashboard():
-    """عرض صفحة لوحة تحكم الإدارة الرئيسية"""
+async def serve_dashboard(request: Request):
+    """عرض صفحة لوحة تحكم الإدارة الرئيسية (محمية بتسجيل الدخول)"""
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=302)
     if not os.path.exists(TEMPLATE_PATH):
         raise HTTPException(status_code=404, detail="Template not found")
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
@@ -108,7 +231,7 @@ async def serve_dashboard():
 
 @app.get("/api/health")
 def health_status():
-    """فحص سلامة السيرفر ومتغيرات البيئة السحابية"""
+    """فحص سلامة السيرفر ومتغيرات البيئة السحابية (مفتوح لفحص Render Health Checks)"""
     import os
     from config.settings import settings
     return {
@@ -121,12 +244,12 @@ def health_status():
     }
 
 @app.get("/api/stats")
-async def get_stats():
+async def get_stats(_: bool = Depends(require_admin)):
     """إحصائيات المنظومة الحية"""
     return db.get_system_stats()
 
 @app.get("/api/deals")
-async def get_deals(limit: int = 150):
+async def get_deals(limit: int = 150, _: bool = Depends(require_admin)):
     """جلب أحدث الصفقات المسجلة بالرادار"""
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -147,7 +270,7 @@ async def get_deals(limit: int = 150):
         return [dict(row) for row in cursor.fetchall()]
 
 @app.put("/api/deals/{deal_id}")
-async def update_deal_endpoint(deal_id: int, payload: DealUpdatePayload):
+async def update_deal_endpoint(deal_id: int, payload: DealUpdatePayload, _: bool = Depends(require_admin)):
     """تعديل بيانات صفقة وسعرها"""
     success = db.update_deal(
         deal_id=deal_id,
@@ -161,7 +284,7 @@ async def update_deal_endpoint(deal_id: int, payload: DealUpdatePayload):
     return {"status": "ok", "message": "تم تحديث الصفقة بنجاح"}
 
 @app.delete("/api/deals/{deal_id}")
-async def delete_deal_endpoint(deal_id: int):
+async def delete_deal_endpoint(deal_id: int, _: bool = Depends(require_admin)):
     """حذف صفقة من المنظومة"""
     success = db.delete_deal(deal_id)
     if not success:
@@ -169,7 +292,7 @@ async def delete_deal_endpoint(deal_id: int):
     return {"status": "ok", "message": "تم حذف الصفقة بنجاح"}
 
 @app.post("/api/deals/{deal_id}/test_send")
-async def test_send_deal_endpoint(deal_id: int):
+async def test_send_deal_endpoint(deal_id: int, _: bool = Depends(require_admin)):
     """إرسال بطاقة صفقة محددة مباشرة إلى تليجرام الإدارة كتجربة عمل"""
     token = settings.TELEGRAM_BOT_TOKEN
     admin_id = settings.ADMIN_TELEGRAM_ID
@@ -216,7 +339,7 @@ async def test_send_deal_endpoint(deal_id: int):
     return {"status": "ok", "message": f"تم إرسال بطاقة ({deal['product_name']}) بنجاح إلى تليجرام الإدارة! 🚀"}
 
 @app.post("/api/deals/test_custom")
-async def test_custom_deal_endpoint(payload: CustomTestDealPayload):
+async def test_custom_deal_endpoint(payload: CustomTestDealPayload, _: bool = Depends(require_admin)):
     """إرسال بطاقة تجريبية مخصصة بالسلعة والسعر المحددين إلى تليجرام الإدارة"""
     token = settings.TELEGRAM_BOT_TOKEN
     admin_id = settings.ADMIN_TELEGRAM_ID
@@ -258,7 +381,7 @@ async def test_custom_deal_endpoint(payload: CustomTestDealPayload):
     return {"status": "ok", "message": f"تم إرسال التجربة لـ ({payload.product_name}) بنجاح إلى تليجرام الإدارة! 🚀"}
 
 @app.get("/api/stores")
-async def get_stores():
+async def get_stores(_: bool = Depends(require_admin)):
     """جلب كافة المتاجر المعتمدة"""
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -266,7 +389,7 @@ async def get_stores():
         return [dict(row) for row in cursor.fetchall()]
 
 @app.post("/api/stores")
-async def create_store(payload: StoreCreatePayload):
+async def create_store(payload: StoreCreatePayload, _: bool = Depends(require_admin)):
     """إضافة متجر جديد لقائمة المراقبة"""
     store_id = db.add_store(
         name=payload.name,
@@ -279,7 +402,7 @@ async def create_store(payload: StoreCreatePayload):
     return {"status": "ok", "store_id": store_id}
 
 @app.put("/api/stores/{store_id}")
-async def update_store_endpoint(store_id: int, payload: StoreUpdatePayload):
+async def update_store_endpoint(store_id: int, payload: StoreUpdatePayload, _: bool = Depends(require_admin)):
     """تعديل بيانات متجر (الاسم، العنوان، الجوال، والتصنيف)"""
     success = db.update_store(
         store_id=store_id,
@@ -294,7 +417,7 @@ async def update_store_endpoint(store_id: int, payload: StoreUpdatePayload):
     return {"status": "ok", "message": "تم تحديث بيانات المتجر بنجاح"}
 
 @app.post("/api/stores/{store_id}/toggle")
-async def toggle_store(store_id: int):
+async def toggle_store(store_id: int, _: bool = Depends(require_admin)):
     """تفعيل أو تعطيل مراقبة متجر"""
     new_status = db.toggle_store_status(store_id)
     if new_status is None:
@@ -302,7 +425,7 @@ async def toggle_store(store_id: int):
     return {"status": "ok", "is_verified": new_status}
 
 @app.delete("/api/stores/{store_id}")
-async def delete_store_endpoint(store_id: int):
+async def delete_store_endpoint(store_id: int, _: bool = Depends(require_admin)):
     """حذف متجر وكافة صفقاته من المنظومة"""
     success = db.delete_store(store_id)
     if not success:
@@ -310,7 +433,7 @@ async def delete_store_endpoint(store_id: int):
     return {"status": "ok", "message": "تم حذف المتجر بنجاح"}
 
 @app.get("/api/subscribers")
-async def get_subscribers():
+async def get_subscribers(_: bool = Depends(require_admin)):
     """جلب قائمة كافة المشتركين"""
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -318,7 +441,7 @@ async def get_subscribers():
         return [dict(row) for row in cursor.fetchall()]
 
 @app.post("/api/subscribers/{chat_id}/extend")
-async def extend_sub_endpoint(chat_id: str, days: int = Query(7, ge=1, le=365)):
+async def extend_sub_endpoint(chat_id: str, days: int = Query(7, ge=1, le=365), _: bool = Depends(require_admin)):
     """تمديد اشتراك تجريبي"""
     success = db.extend_subscriber_trial(chat_id=chat_id, days=days)
     if not success:
@@ -326,7 +449,7 @@ async def extend_sub_endpoint(chat_id: str, days: int = Query(7, ge=1, le=365)):
     return {"status": "ok", "message": f"تم تمديد التجربة لمدة {days} أيام"}
 
 @app.post("/api/subscribers/{chat_id}/status")
-async def update_sub_status_endpoint(chat_id: str, status: str = Query("active")):
+async def update_sub_status_endpoint(chat_id: str, status: str = Query("active"), _: bool = Depends(require_admin)):
     """ترقية أو تغيير حالة اشتراك"""
     success = db.update_subscriber_status(chat_id=chat_id, status=status)
     if not success:
@@ -334,7 +457,7 @@ async def update_sub_status_endpoint(chat_id: str, status: str = Query("active")
     return {"status": "ok", "message": f"تم تغيير حالة المشترك إلى {status}"}
 
 @app.post("/api/broadcast")
-async def broadcast_endpoint(payload: BroadcastPayload):
+async def broadcast_endpoint(payload: BroadcastPayload, _: bool = Depends(require_admin)):
     """بث إشعار عام من لوحة الويب إلى كافة مشتركي التليجرام"""
     token = settings.TELEGRAM_BOT_TOKEN
     if not token:
