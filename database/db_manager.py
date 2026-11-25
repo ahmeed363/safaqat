@@ -292,15 +292,21 @@ class DatabaseManager:
         return res
 
     def get_active_subscribers(self) -> List[Dict[str, Any]]:
-        """جلب المشتركين النشطين (سواء في فترة التجربة أو اشتراك مفعل)"""
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        """جلب المشتركين النشطين (في وضع الإطلاق المجاني يشمل كل غير المنتهين لضمان استمرار البث)"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-            SELECT * FROM subscribers 
-            WHERE subscription_status = 'active' 
-               OR (subscription_status = 'trial' AND trial_ends_at >= ?)
-            """, (now,))
+            if getattr(settings, "FREE_LAUNCH_MODE", True):
+                cursor.execute("""
+                SELECT * FROM subscribers 
+                WHERE COALESCE(subscription_status, 'trial') != 'expired'
+                """)
+            else:
+                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                cursor.execute("""
+                SELECT * FROM subscribers 
+                WHERE subscription_status = 'active' 
+                   OR (subscription_status = 'trial' AND trial_ends_at >= ?)
+                """, (now,))
             return [dict(row) for row in cursor.fetchall()]
 
     def get_system_stats(self) -> Dict[str, Any]:

@@ -23,6 +23,9 @@ class Settings:
     ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "safaqat2026")
     SECRET_KEY: str = os.getenv("SECRET_KEY", "safaqat-secure-admin-session-key-2026")
 
+    # وضع الإطلاق المجاني (إلغاء إظهار "اشتراك تجريبي" للمشتركين واستمرار البث مجاناً)
+    FREE_LAUNCH_MODE: bool = os.getenv("FREE_LAUNCH_MODE", "true").lower() in ("true", "1", "yes")
+
     # إعدادات فترات العمل الآلي
     MONITOR_INTERVAL_MINUTES: int = int(os.getenv("MONITOR_INTERVAL_MINUTES", "15"))
     DISCOVERY_INTERVAL_HOURS: int = int(os.getenv("DISCOVERY_INTERVAL_HOURS", "6"))

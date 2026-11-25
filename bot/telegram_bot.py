@@ -299,12 +299,20 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         full_name=user.full_name or "صديق صفقات"
     )
 
-    welcome_msg = (
-        f"أهلاً بك يا {user.first_name} في **رادار صفقات غزة الذكي** ⚡\n\n"
-        f"🎁 اشتراكك التجريبي مفعل مجاناً حتى: `{sub_data.get('trial_ends_at', 'أسبوع من الآن')}`\n"
-        f"🔒 عروض مفرق وتجزئة حية من صفحات ومتاجر القطاع مباشرة لهاتفك.\n\n"
-        f"👇 **اختر طريقة استعراض الصفقات والعروض:**"
-    )
+    if getattr(settings, "FREE_LAUNCH_MODE", True):
+        welcome_msg = (
+            f"أهلاً بك يا {user.first_name} في **رادار صفقات غزة الذكي** ⚡\n\n"
+            f"✅ حسابك مفعل مجاناً بالكامل — تصلك أحدث عروض التوفير وحرق الأسعار في غزة لحظة بلحظة.\n"
+            f"🔒 عروض مفرق وتجزئة حية من صفحات ومتاجر القطاع مباشرة لهاتفك.\n\n"
+            f"👇 **اختر طريقة استعراض الصفقات والعروض:**"
+        )
+    else:
+        welcome_msg = (
+            f"أهلاً بك يا {user.first_name} في **رادار صفقات غزة الذكي** ⚡\n\n"
+            f"🎁 اشتراكك التجريبي مفعل مجاناً حتى: `{sub_data.get('trial_ends_at', 'أسبوع من الآن')}`\n"
+            f"🔒 عروض مفرق وتجزئة حية من صفحات ومتاجر القطاع مباشرة لهاتفك.\n\n"
+            f"👇 **اختر طريقة استعراض الصفقات والعروض:**"
+        )
 
     is_admin = (chat_id == str(settings.ADMIN_TELEGRAM_ID))
 
@@ -829,12 +837,19 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status = sub["subscription_status"]
     trial_ends = sub["trial_ends_at"]
 
-    msg = (
-        f"📊 **حالة اشتراكك:**\n\n"
-        f"👤 الاسم: {sub['full_name']}\n"
-        f"📌 نوع الاشتراك: {'فترة تجريبية مجانية 🎁' if status == 'trial' else 'اشتراك مدفوع مفعل ✅'}\n"
-        f"⏳ ينتهي في: `{trial_ends}`"
-    )
+    if getattr(settings, "FREE_LAUNCH_MODE", True):
+        msg = (
+            f"📊 **حالة اشتراكك:**\n\n"
+            f"👤 الاسم: {sub['full_name']}\n"
+            f"📌 حالة الاشتراك: **مفعل مجاناً بالكامل ✅**"
+        )
+    else:
+        msg = (
+            f"📊 **حالة اشتراكك:**\n\n"
+            f"👤 الاسم: {sub['full_name']}\n"
+            f"📌 نوع الاشتراك: {'فترة تجريبية مجانية 🎁' if status == 'trial' else 'اشتراك مدفوع مفعل ✅'}\n"
+            f"⏳ ينتهي في: `{trial_ends}`"
+        )
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def latest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
