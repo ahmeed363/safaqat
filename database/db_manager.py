@@ -37,11 +37,17 @@ class DatabaseManager:
                 category TEXT,
                 phone TEXT,
                 is_verified INTEGER DEFAULT 1,
+                is_partner INTEGER DEFAULT 0,
                 discovery_source TEXT DEFAULT 'manual',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_checked_at TIMESTAMP
             );
             """)
+
+            cursor.execute("PRAGMA table_info(stores)")
+            store_cols = {row[1] for row in cursor.fetchall()}
+            if "is_partner" not in store_cols:
+                cursor.execute("ALTER TABLE stores ADD COLUMN is_partner INTEGER DEFAULT 0")
 
             # 2. جدول الروابط المستكشفة للتحقق منها لاحقاً (Discovered Links)
             cursor.execute("""
@@ -378,6 +384,17 @@ class DatabaseManager:
             conn.commit()
             _turso_sync("UPDATE stores SET is_verified = 1 - is_verified WHERE id = ?", (store_id,))
             cursor.execute("SELECT is_verified FROM stores WHERE id = ?", (store_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def toggle_store_partner(self, store_id: int) -> Optional[int]:
+        """ترقية أو إلغاء تمييز متجر كشريك رسمي (⭐ أولوية في البوت والويب)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE stores SET is_partner = 1 - COALESCE(is_partner, 0) WHERE id = ?", (store_id,))
+            conn.commit()
+            _turso_sync("UPDATE stores SET is_partner = 1 - COALESCE(is_partner, 0) WHERE id = ?", (store_id,))
+            cursor.execute("SELECT COALESCE(is_partner, 0) FROM stores WHERE id = ?", (store_id,))
             row = cursor.fetchone()
             return row[0] if row else None
 

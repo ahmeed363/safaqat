@@ -266,7 +266,7 @@ async def get_public_deals(limit: int = Query(120, ge=10, le=200)):
 
         cursor.execute("""
         SELECT d.id, d.product_name, d.price, d.currency, d.location, d.post_time_text, d.creation_time,
-               s.city_area as store_area, s.category as store_category
+               s.city_area as store_area, s.category as store_category, COALESCE(s.is_partner, 0) as is_partner
         FROM deals d
         LEFT JOIN stores s ON d.store_id = s.id
         WHERE d.is_bargain = 1
@@ -276,6 +276,7 @@ async def get_public_deals(limit: int = Query(120, ge=10, le=200)):
                 WHEN d.post_time_text LIKE 'أمس%' THEN 2
                 ELSE 3
             END ASC,
+            COALESCE(s.is_partner, 0) DESC,
             COALESCE(d.creation_time, 0) DESC,
             d.id DESC
         LIMIT ?
@@ -303,6 +304,7 @@ async def get_public_deals(limit: int = Query(120, ge=10, le=200)):
             "area": _extract_general_area(r.get("location", ""), r.get("store_area", "")),
             "post_time_text": r.get("post_time_text") or "اليوم",
             "category": r.get("store_category") or "عام",
+            "is_partner": bool(r.get("is_partner", 0)),
         })
 
     return {
@@ -507,6 +509,14 @@ async def toggle_store(store_id: int, _: bool = Depends(require_admin)):
     if new_status is None:
         raise HTTPException(status_code=404, detail="المتجر غير موجود")
     return {"status": "ok", "is_verified": new_status}
+
+@app.post("/api/stores/{store_id}/partner")
+async def toggle_store_partner_endpoint(store_id: int, _: bool = Depends(require_admin)):
+    """ترقية أو إلغاء تمييز متجر كشريك رسمي (أولوية في الويب والبوت)"""
+    new_partner = db.toggle_store_partner(store_id)
+    if new_partner is None:
+        raise HTTPException(status_code=404, detail="المتجر غير موجود")
+    return {"status": "ok", "is_partner": new_partner}
 
 @app.delete("/api/stores/{store_id}")
 async def delete_store_endpoint(store_id: int, _: bool = Depends(require_admin)):

@@ -23,10 +23,10 @@ def sync_from_turso_on_boot(local_db_path: str = "safaqat.db"):
             stores = turso.query("SELECT * FROM stores;")
             for s in stores:
                 c.execute("""
-                INSERT INTO stores (id, name, url, platform, city_area, category, phone, is_verified, discovery_source, created_at, last_checked_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET name=excluded.name, city_area=excluded.city_area, phone=excluded.phone, is_verified=excluded.is_verified, url=excluded.url;
-                """, [s.get("id"), s.get("name"), s.get("url"), s.get("platform"), s.get("city_area"), s.get("category"), s.get("phone"), s.get("is_verified"), s.get("discovery_source"), s.get("created_at"), s.get("last_checked_at")])
+                INSERT INTO stores (id, name, url, platform, city_area, category, phone, is_verified, is_partner, discovery_source, created_at, last_checked_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET name=excluded.name, city_area=excluded.city_area, phone=excluded.phone, is_verified=excluded.is_verified, is_partner=excluded.is_partner, url=excluded.url;
+                """, [s.get("id"), s.get("name"), s.get("url"), s.get("platform"), s.get("city_area"), s.get("category"), s.get("phone"), s.get("is_verified"), s.get("is_partner", 0), s.get("discovery_source"), s.get("created_at"), s.get("last_checked_at")])
             print(f"[TursoSync] • تم استيراد {len(stores)} متجراً معتمداً من السحابة.")
         except Exception as e:
             print(f"[TursoSync] stores sync note: {e}")

@@ -825,12 +825,16 @@
                     const statusBadge = s.is_verified 
                         ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">نشط يرصده الرادار</span>`
                         : `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-700 text-slate-400">معطل مؤقتاً</span>`;
+                    const partnerBadge = s.is_partner
+                        ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/40">⭐ شريك</span>`
+                        : '';
 
                     return `
-                    <tr class="hover:bg-slate-800/40 transition">
+                    <tr class="hover:bg-slate-800/40 transition ${s.is_partner ? 'bg-amber-500/5' : ''}">
                         <td class="p-4 text-xs text-slate-500">${idx + 1}</td>
                         <td class="p-4 font-bold text-white flex items-center gap-2">
                             ${s.name}
+                            ${partnerBadge}
                             <a href="${s.url}" target="_blank" class="text-slate-400 hover:text-sky-400 text-xs" title="فتح صفحة فيسبوك"><i class="fa-brands fa-facebook"></i></a>
                         </td>
                         <td class="p-4 text-xs font-semibold text-slate-300">${s.city_area || 'غزة'}</td>
@@ -839,6 +843,9 @@
                         <td class="p-4">${statusBadge}</td>
                         <td class="p-4 text-center">
                             <div class="inline-flex items-center gap-2">
+                                <button onclick="toggleStorePartner(${s.id})" class="p-2 rounded-lg ${s.is_partner ? 'bg-amber-400 text-slate-950' : 'bg-slate-700 text-amber-400 hover:bg-amber-500/20'} text-xs font-bold transition" title="${s.is_partner ? 'إلغاء تمييز الشريك' : 'ترقية كمتجر شريك مميز ⭐'}">
+                                    <i class="fa-solid fa-star"></i>
+                                </button>
                                 <button onclick="openEditStoreModal(${s.id})" class="p-2 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-900 text-xs font-bold transition" title="تعديل بيانات المتجر (العنوان والجوال)">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
@@ -856,6 +863,13 @@
             } catch (e) {
                 tbody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-rose-400">خطأ: ${e.message}</td></tr>`;
             }
+        }
+
+        async function toggleStorePartner(id) {
+            try {
+                const res = await fetch(`/api/stores/${id}/partner`, { method: 'POST' });
+                if (res.ok) loadStores();
+            } catch (e) { alert("خطأ: " + e.message); }
         }
 
         async function toggleStoreStatus(id) {

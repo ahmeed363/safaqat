@@ -121,7 +121,8 @@ def render_deal_card(deal: dict, is_admin: bool = False, is_broadcast: bool = Fa
 
     # في حال النمط الكامل: تظهر باقي التفاصيل والموقع
     lines.append("──────────────────────")
-    lines.append(f"🏪 **المتجر:** {store}")
+    partner_tag = " ⭐ *(شريك معتمد)*" if deal.get("is_partner") else ""
+    lines.append(f"🏪 **المتجر:** {store}{partner_tag}")
     lines.append(f"📍 **الموقع:** {location}")
     lines.append(f"⏰ **توقيت العرض:** {time_str}")
 
@@ -336,7 +337,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             with db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                SELECT d.*, s.name as store_name, s.url as store_url
+                SELECT d.*, s.name as store_name, s.url as store_url, COALESCE(s.is_partner, 0) as is_partner
                 FROM deals d
                 LEFT JOIN stores s ON d.store_id = s.id
                 WHERE d.id = ?
@@ -666,7 +667,7 @@ async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-            SELECT d.*, s.name as store_name, s.url as store_url 
+            SELECT d.*, s.name as store_name, s.url as store_url, COALESCE(s.is_partner, 0) as is_partner
             FROM deals d 
             LEFT JOIN stores s ON d.store_id = s.id 
             WHERE d.id = ?
@@ -755,7 +756,7 @@ async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-            SELECT d.*, s.name as store_name, s.url as store_url 
+            SELECT d.*, s.name as store_name, s.url as store_url, COALESCE(s.is_partner, 0) as is_partner
             FROM deals d 
             LEFT JOIN stores s ON d.store_id = s.id 
             WHERE d.id = ?

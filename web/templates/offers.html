@@ -231,15 +231,24 @@
                 const area = escapeHtml(d.area);
                 const timeTxt = escapeHtml(d.post_time_text);
                 const tgUrl = `https://t.me/gaza_safaqat_bot?start=deal_${d.id}`;
+                const partnerCardCls = d.is_partner
+                    ? 'border-amber-400/60 bg-gradient-to-br from-slate-800/90 to-amber-950/20 shadow-amber-500/10'
+                    : 'border-slate-700/80 hover:border-emerald-500/50 bg-slate-800/75';
+                const partnerBadge = d.is_partner
+                    ? `<span class="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black">⭐ شريك معتمد</span>`
+                    : '';
 
                 return `
-                <article class="bg-slate-800/75 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-lg transition">
+                <article class="${partnerCardCls} border rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-lg transition">
                     <div class="space-y-3">
                         <div class="flex items-center justify-between gap-2 text-[11px]">
-                            <span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-emerald-300 font-bold flex items-center gap-1">
-                                <i class="fa-solid fa-location-dot"></i>
-                                ${area}
-                            </span>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-emerald-300 font-bold flex items-center gap-1">
+                                    <i class="fa-solid fa-location-dot"></i>
+                                    ${area}
+                                </span>
+                                ${partnerBadge}
+                            </div>
                             <span class="text-slate-400 font-semibold">${timeTxt}</span>
                         </div>
 
