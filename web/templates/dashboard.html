@@ -1035,6 +1035,12 @@
                        </span>`
                     : '';
 
+                const refBadge = (s.referral_count && s.referral_count > 0)
+                    ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/40" title="عدد الأصدقاء المنضمين عبر رابط دعوته">
+                           🎯 ${s.referral_count} دعوة
+                       </span>`
+                    : '';
+
                 const statusBadge = s.subscription_status === 'trial'
                     ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">تجريبي مجاني</span>`
                     : `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">اشتراك مفعل</span>`;
@@ -1045,6 +1051,7 @@
                         <div class="flex items-center gap-2">
                             <span class="font-bold text-white">${s.full_name || 'صديق صفقات'}</span>
                             ${newBadge}
+                            ${refBadge}
                         </div>
                     </td>
                     <td class="p-4 text-xs text-sky-400">${s.username ? '@' + s.username : '-'}</td>

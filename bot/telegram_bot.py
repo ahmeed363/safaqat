@@ -1,5 +1,6 @@
 import logging
 import re
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, TypeHandler
@@ -174,7 +175,7 @@ def get_admin_panel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 def get_main_menu_keyboard(is_admin: bool = False) -> InlineKeyboardMarkup:
-    """القائمة الرئيسية: تصنيف بالسلعة أو بالمنطقة (مع زر خاص بالإدارة فقط للوحة التحكم وزر بحث فوري)"""
+    """القائمة الرئيسية: تصنيف بالسلعة أو بالمنطقة (مع أزرار المشاركة والقناة ولوحة الإدارة)"""
     keyboard = [
         [
             InlineKeyboardButton("🗂️ تصفح حسب نوع السلعة", callback_data="nav_cats"),
@@ -183,6 +184,10 @@ def get_main_menu_keyboard(is_admin: bool = False) -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("🔍 بحث فوري عن سلعة", callback_data="nav_search"),
             InlineKeyboardButton("🔥 أحدث عروض اليوم (الكل)", callback_data="filter_all")
+        ],
+        [
+            InlineKeyboardButton("🎁 شارك مع أهلك وأصدقائك", callback_data="nav_share"),
+            InlineKeyboardButton("📢 قناة العروض اليومية", url="https://t.me/gaza_safaqat")
         ]
     ]
     if is_admin:
@@ -359,8 +364,29 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         disable_web_page_preview=True,
                         reply_markup=markup
                     )
-    elif start_param in ("channel_teaser", "web_offers_bar"):
-        # عرض أحدث 3 لقطات حية مباشرة للقادمين من الويب أو القناة لتجربة فورية سريعة
+    elif start_param in ("channel_teaser", "web_offers_bar") or start_param.startswith("ref_"):
+        # معالجة الدعوة والانتشار الفيروسي (?start=ref_<inviter_id>)
+        if start_param.startswith("ref_"):
+            inviter_id = start_param.split("ref_", 1)[1].strip()
+            updated_inviter = db.record_referral(new_user_chat_id=chat_id, inviter_chat_id=inviter_id)
+            if updated_inviter:
+                try:
+                    inv_name = updated_inviter.get("full_name") or "صديق صفقات"
+                    ref_cnt = int(updated_inviter.get("referral_count") or 1)
+                    await context.bot.send_message(
+                        chat_id=str(inviter_id),
+                        text=(
+                            f"🎉 **مبارك يا {inv_name}!**\n"
+                            f"انضم مشترك جديد الآن عن طريق رابط دعوتك الخاصة 🤝\n\n"
+                            f"🎯 **إجمالي دعواتك الناجحة:** `{ref_cnt}` مشترك\n"
+                            f"شكراً لمساهمتك في مساعدة أهالي غزة للوصول لأرخص الأسعار ❤️"
+                        ),
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    logging.warning(f"[ReferralNotify] Failed notifying {inviter_id}: {e}")
+
+        # عرض أحدث 3 لقطات حية مباشرة للقادمين من الويب أو القناة أو الدعوة لتجربة فورية سريعة
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -423,6 +449,32 @@ async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔍 **اكتب اسم السلعة أو المحل مباشرة في المحادثة:**\n(مثال: `جبنة`، `سكر`، `زيت`، `حليب`، `طلال عواد`، `دجاج`)\nوسأجلب لك أحدث العروض وأسعارها فوراً!",
             parse_mode="Markdown"
         )
+        return
+
+    if data == "nav_share":
+        sub = db.get_subscriber(chat_id) or {}
+        ref_count = int(sub.get("referral_count") or 0)
+        ref_link = f"https://t.me/gaza_safaqat_bot?start=ref_{chat_id}"
+        share_text = (
+            "🛒 وفّر ع مصروف بيتك في غزة!\n"
+            "شوف أسعار وتخفيضات أكثر من 100 سوبرماركت ومول بالقطاع يومياً أول بأول مجاناً ⚡\n"
+            "دليل الأسعار: https://safaqat-pi7r.onrender.com/gaza\n"
+            "أو ادخل مباشرة عبر رابطي:"
+        )
+        tg_share_url = f"https://t.me/share/url?url={urllib.parse.quote(ref_link)}&text={urllib.parse.quote(share_text)}"
+        share_msg = (
+            "🎁 **شارك رادار صفقات غزة مع أهلك وأصدقائك!**\n\n"
+            "ساعد معارفك وجيرانك يعرفوا أرخص الأسعار الحقيقية في غزة قبل ما ينزلوا السوق ❤️\n\n"
+            f"🎯 **عدد من انضموا عبر رابطك حتى الآن:** `{ref_count}` مشترك\n\n"
+            "🔗 **رابط دعوتك الشخصي (اضغط للنسخ أو المشاركة):**\n"
+            f"`{ref_link}`\n\n"
+            "👇 **اضغط الزر بالأسفل لإرساله لأهلك أو لمجموعات الواتساب وتليجرام بضغطة واحدة:**"
+        )
+        share_kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📤 مشاركة فورية على تليجرام", url=tg_share_url)],
+            [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="nav_main")]
+        ])
+        await query.message.edit_text(share_msg, parse_mode="Markdown", reply_markup=share_kb, disable_web_page_preview=True)
         return
 
     if data == "nav_areas":

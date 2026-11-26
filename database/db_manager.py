@@ -89,9 +89,19 @@ class DatabaseManager:
                 area_preference TEXT DEFAULT 'all',
                 subscription_status TEXT DEFAULT 'trial', -- trial, active, expired
                 trial_ends_at TIMESTAMP,
+                referred_by TEXT,
+                referral_count INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
+
+            # ترقية الجدول الحالي إن لزم الأمر
+            cursor.execute("PRAGMA table_info(subscribers)")
+            sub_cols = {row[1] for row in cursor.fetchall()}
+            if "referred_by" not in sub_cols:
+                cursor.execute("ALTER TABLE subscribers ADD COLUMN referred_by TEXT")
+            if "referral_count" not in sub_cols:
+                cursor.execute("ALTER TABLE subscribers ADD COLUMN referral_count INTEGER DEFAULT 0")
 
             conn.commit()
 
@@ -433,6 +443,47 @@ class DatabaseManager:
             conn.commit()
             _turso_sync("UPDATE subscribers SET subscription_status = ? WHERE telegram_chat_id = ?", (status, str(chat_id)))
             return cursor.rowcount > 0
+
+    def record_referral(self, new_user_chat_id: str, inviter_chat_id: str) -> Optional[Dict[str, Any]]:
+        """تسجيل إحالة مشترك جديد ومكافأة الداعي بزيادة رصيد دعواته"""
+        new_cid = str(new_user_chat_id).strip()
+        inv_cid = str(inviter_chat_id).strip()
+        if not new_cid or not inv_cid or new_cid == inv_cid:
+            return None
+
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT referred_by, (julianday('now') - julianday(created_at)) * 86400 AS age_sec
+                FROM subscribers WHERE telegram_chat_id = ?
+            """, (new_cid,))
+            new_row = cursor.fetchone()
+            if not new_row or new_row[0] or (new_row[1] is not None and new_row[1] > 300):
+                return None  # مسجل مسبقاً بدعوة أو عضو قديم
+
+            cursor.execute("SELECT * FROM subscribers WHERE telegram_chat_id = ?", (inv_cid,))
+            inv_row = cursor.fetchone()
+            if not inv_row:
+                return None
+
+            cursor.execute("UPDATE subscribers SET referred_by = ? WHERE telegram_chat_id = ?", (inv_cid, new_cid))
+            cursor.execute("UPDATE subscribers SET referral_count = COALESCE(referral_count, 0) + 1 WHERE telegram_chat_id = ?", (inv_cid,))
+            conn.commit()
+
+            cursor.execute("SELECT * FROM subscribers WHERE telegram_chat_id = ?", (inv_cid,))
+            updated_inviter = dict(cursor.fetchone())
+
+        _turso_sync("UPDATE subscribers SET referred_by = ? WHERE telegram_chat_id = ?", (inv_cid, new_cid))
+        _turso_sync("UPDATE subscribers SET referral_count = COALESCE(referral_count, 0) + 1 WHERE telegram_chat_id = ?", (inv_cid,))
+        return updated_inviter
+
+    def get_subscriber(self, chat_id: str) -> Optional[Dict[str, Any]]:
+        """جلب بيانات مشترك محدد"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM subscribers WHERE telegram_chat_id = ?", (str(chat_id),))
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
 db = DatabaseManager()
 
