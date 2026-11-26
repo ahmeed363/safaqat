@@ -63,6 +63,7 @@ app = FastAPI(title="رادار صفقات غزة - لوحة تحكم الإدا
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "dashboard.html")
 LOGIN_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "login.html")
+OFFERS_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "offers.html")
 SESSION_COOKIE_NAME = "safaqat_admin_session"
 
 # --- Authentication Helpers ---
@@ -226,6 +227,89 @@ async def serve_dashboard(request: Request):
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
         html_content = f.read()
     return HTMLResponse(content=html_content)
+
+@app.get("/gaza", response_class=HTMLResponse)
+@app.get("/offers", response_class=HTMLResponse)
+async def serve_public_offers():
+    """عرض الواجهة العامة المجانية لعروض اليوم في غزة (بوابة جذب المشتركين)"""
+    if not os.path.exists(OFFERS_TEMPLATE_PATH):
+        raise HTTPException(status_code=404, detail="Offers page not found")
+    with open(OFFERS_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content)
+
+def _extract_general_area(raw_loc: str, store_area: str = "") -> str:
+    """تحديد المحافظة/المدينة فقط دون كشف العنوان التفصيلي أو اسم المتجر"""
+    combined = f"{raw_loc or ''} {store_area or ''}".lower()
+    if any(k in combined for k in ("رفح", "rafah")):
+        return "رفح والمواصي"
+    if any(k in combined for k in ("خانيونس", "خان يونس", "khan yunis", "khanyounis")):
+        return "خانيونس"
+    if any(k in combined for k in ("دير البلح", "deir")):
+        return "دير البلح"
+    if any(k in combined for k in ("النصيرات", "الوسطى", "البريج", "المغازي", "الزوايدة", "nuseirat")):
+        return "المحافظة الوسطى"
+    if any(k in combined for k in ("غزة", "gaza", "الشمال", "جباليا", "الرمال", "الشيخ رضوان", "الشجاعية", "النفق", "التفاح", "فهمي بيك", "الجلاء", "تل الهوا")):
+        return "مدينة غزة والشمال"
+    return "قطاع غزة"
+
+@app.get("/api/public/deals")
+async def get_public_deals(limit: int = Query(120, ge=10, le=200)):
+    """جلب أحدث الصفقات للعرض العام مع إخفاء اسم المتجر والهاتف والعنوان التفصيلي"""
+    from core.ai_evaluator import is_invalid_product_name
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM stores WHERE is_verified = 1")
+        stores_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM deals WHERE is_bargain = 1 AND (post_time_text LIKE 'اليوم%' OR created_at >= date('now'))")
+        today_deals_count = cursor.fetchone()[0]
+
+        cursor.execute("""
+        SELECT d.id, d.product_name, d.price, d.currency, d.location, d.post_time_text, d.creation_time,
+               s.city_area as store_area, s.category as store_category
+        FROM deals d
+        LEFT JOIN stores s ON d.store_id = s.id
+        WHERE d.is_bargain = 1
+        ORDER BY
+            CASE
+                WHEN d.post_time_text LIKE 'اليوم%' THEN 1
+                WHEN d.post_time_text LIKE 'أمس%' THEN 2
+                ELSE 3
+            END ASC,
+            COALESCE(d.creation_time, 0) DESC,
+            d.id DESC
+        LIMIT ?
+        """, (limit,))
+        rows = [dict(r) for r in cursor.fetchall()]
+
+    public_deals = []
+    for r in rows:
+        p_name = str(r.get("product_name") or "").strip()
+        if is_invalid_product_name(p_name):
+            continue
+        curr_raw = str(r.get("currency") or "ILS").upper()
+        curr_label = "شيكل" if curr_raw in ("ILS", "NIS", "SHEKEL", "شيكل") else ("$" if curr_raw in ("USD", "دولار") else curr_raw)
+        try:
+            p_val = float(r.get("price", 0))
+            p_str = str(int(p_val)) if p_val.is_integer() else f"{p_val:.1f}".rstrip("0").rstrip(".")
+        except Exception:
+            p_str = str(r.get("price", ""))
+
+        public_deals.append({
+            "id": r["id"],
+            "product_name": p_name,
+            "price": p_str,
+            "currency": curr_label,
+            "area": _extract_general_area(r.get("location", ""), r.get("store_area", "")),
+            "post_time_text": r.get("post_time_text") or "اليوم",
+            "category": r.get("store_category") or "عام",
+        })
+
+    return {
+        "stores_count": stores_count,
+        "today_deals_count": today_deals_count,
+        "deals": public_deals,
+    }
 
 # --- API Endpoints ---
 

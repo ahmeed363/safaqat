@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>رادار صفقات غزة ⚡ | أسعار وعروض الأسواق اليومية</title>
+    <meta name="description" content="اعرف أرخص أسعار السلع الأساسية والمواد التموينية واللحوم والخضار في متاجر وسوبرماركتات قطاع غزة لحظة بلحظة مجاناً.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Cairo', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #060d18;
+            background-image:
+                radial-gradient(at 15% 5%, rgba(16, 185, 129, 0.14) 0px, transparent 45%),
+                radial-gradient(at 85% 15%, rgba(245, 158, 11, 0.08) 0px, transparent 45%);
+        }
+        .area-btn.active {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #ffffff;
+            border-color: #34d399;
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen pb-24">
+
+    <!-- Top Header -->
+    <header class="bg-slate-900/85 backdrop-blur-lg border-b border-slate-800 sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-amber-400 flex items-center justify-center text-slate-950 shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-bolt text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-black text-white leading-tight">رادار صفقات غزة</h1>
+                    <p class="text-[11px] text-emerald-400 font-bold flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        تحديث حي لأسعار الأسواق اليوم
+                    </p>
+                </div>
+            </div>
+
+            <a href="https://t.me/gaza_safaqat" target="_blank" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-extrabold shadow-lg shadow-sky-600/25 transition">
+                <i class="fa-brands fa-telegram text-base"></i>
+                <span>قناة تليجرام</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 pt-6 space-y-6">
+
+        <!-- Hero Section -->
+        <section class="bg-gradient-to-br from-slate-800/85 to-slate-900/95 border border-emerald-500/25 rounded-3xl p-5 sm:p-8 shadow-2xl relative overflow-hidden">
+            <div class="relative z-10 max-w-3xl space-y-4">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-xs font-extrabold">
+                    <i class="fa-solid fa-fire"></i>
+                    <span>خدمة مجانية 100% لأهالي قطاع غزة</span>
+                </div>
+                <h2 class="text-2xl sm:text-4xl font-black text-white leading-snug">
+                    اعرف أرخص <span class="text-emerald-400">أسعار السلع اليوم</span> قبل ما تنزل السوق 🛒
+                </h2>
+                <p class="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
+                    نرصد يومياً عروض وتخفيضات كبرى المحلات والسوبرماركتات في مختلف محافظات غزة. ابحث عن أي سلعة أو اختر منطقتك، واضغط لكشف اسم المحل ورقم التاجر فوراً.
+                </p>
+
+                <!-- Live Trust Stats (Hides small subscriber count, highlights stores & deals!) -->
+                <div class="flex flex-wrap items-center gap-3 pt-1">
+                    <div class="px-3.5 py-2 rounded-xl bg-slate-950/70 border border-slate-700/80 text-xs font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-store text-amber-400"></i>
+                        <span><strong id="hero-stores-count" class="text-white">100+</strong> متجر وسوبرماركت مرصود</span>
+                    </div>
+                    <div class="px-3.5 py-2 rounded-xl bg-slate-950/70 border border-slate-700/80 text-xs font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-bolt text-emerald-400"></i>
+                        <span><strong id="hero-today-count" class="text-emerald-400">...</strong> عرضاً مسجلاً اليوم</span>
+                    </div>
+                    <div class="px-3.5 py-2 rounded-xl bg-slate-950/70 border border-slate-700/80 text-xs font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-clock text-sky-400"></i>
+                        <span>فحص وتحديث تلقائي مستمر</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Search & Filters -->
+        <section class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-4 space-y-4">
+            <div class="relative">
+                <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </div>
+                <input
+                    type="text"
+                    id="search-input"
+                    oninput="renderDeals()"
+                    placeholder="ابحث عن أي سلعة... (مثال: جبنة، سكر، زيت، دجاج، نسكافيه، منظفات)"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-xl py-3.5 pr-11 pl-4 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-semibold"
+                >
+            </div>
+
+            <!-- Area Filter Pills -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar" id="area-filters">
+                <button onclick="setArea('الكل', this)" class="area-btn active px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-300 whitespace-nowrap transition">
+                    🌍 كل المحافظات
+                </button>
+                <button onclick="setArea('مدينة غزة والشمال', this)" class="area-btn px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-300 whitespace-nowrap transition">
+                    🏙️ غزة والشمال
+                </button>
+                <button onclick="setArea('دير البلح', this)" class="area-btn px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-300 whitespace-nowrap transition">
+                    🌴 دير البلح
+                </button>
+                <button onclick="setArea('المحافظة الوسطى', this)" class="area-btn px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-300 whitespace-nowrap transition">
+                    🏘️ الوسطى والنصيرات
+                </button>
+                <button onclick="setArea('خانيونس', this)" class="area-btn px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-300 whitespace-nowrap transition">
+                    🌾 خانيونس
+                </button>
+                <button onclick="setArea('رفح والمواصي', this)" class="area-btn px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-300 whitespace-nowrap transition">
+                    ⛺ رفح والمواصي
+                </button>
+            </div>
+        </section>
+
+        <!-- Results Counter -->
+        <div class="flex items-center justify-between px-1">
+            <h3 class="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                <i class="fa-solid fa-tags text-emerald-400"></i>
+                أحدث العروض واللقطات المرصودة
+            </h3>
+            <span id="results-count" class="text-xs font-bold text-slate-400">جاري التحميل...</span>
+        </div>
+
+        <!-- Deals Grid -->
+        <section id="deals-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Populated by JS -->
+        </section>
+
+    </main>
+
+    <!-- Sticky Bottom CTA Banner -->
+    <div class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-lg border-t border-emerald-500/30 p-3 z-50 shadow-2xl">
+        <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
+            <div class="text-xs sm:text-sm">
+                <p class="font-extrabold text-white">احصل على تنبيه فوري بأرخص الأسعار على هاتفك 📲</p>
+                <p class="text-[11px] text-emerald-400 font-semibold hidden sm:block">انضم مجاناً ليصلك كل عرض جديد مع اسم المحل وموقعه ورقم التاجر</p>
+            </div>
+            <a href="https://t.me/gaza_safaqat_bot?start=web_offers_bar" target="_blank" class="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs sm:text-sm font-black shadow-lg shadow-emerald-600/30 transition">
+                <i class="fa-brands fa-telegram text-base"></i>
+                <span>اشترك مجاناً الآن</span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        let allDeals = [];
+        let selectedArea = 'الكل';
+
+        function setArea(area, btn) {
+            selectedArea = area;
+            document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderDeals();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        async function loadPublicDeals() {
+            const grid = document.getElementById('deals-grid');
+            grid.innerHTML = `
+                <div class="col-span-full py-16 text-center text-slate-400 space-y-3">
+                    <i class="fa-solid fa-spinner fa-spin text-3xl text-emerald-400"></i>
+                    <p class="text-sm font-bold">جاري سحب أحدث الأسعار من أسواق غزة...</p>
+                </div>`;
+
+            try {
+                const res = await fetch('/api/public/deals?limit=120');
+                const data = await res.json();
+                allDeals = data.deals || [];
+                document.getElementById('hero-stores-count').textContent = (data.stores_count || 100) + '+';
+                document.getElementById('hero-today-count').textContent = data.today_deals_count || allDeals.length;
+                renderDeals();
+            } catch (e) {
+                grid.innerHTML = `<div class="col-span-full py-12 text-center text-rose-400 font-bold">تعذر تحميل العروض حالياً، يرجى إعادة المحاولة.</div>`;
+            }
+        }
+
+        function renderDeals() {
+            const grid = document.getElementById('deals-grid');
+            const q = (document.getElementById('search-input').value || '').trim().toLowerCase();
+
+            const filtered = allDeals.filter(d => {
+                const matchSearch = !q ||
+                    (d.product_name && d.product_name.toLowerCase().includes(q)) ||
+                    (d.area && d.area.toLowerCase().includes(q)) ||
+                    (d.category && d.category.toLowerCase().includes(q));
+                const matchArea = selectedArea === 'الكل' || d.area === selectedArea;
+                return matchSearch && matchArea;
+            });
+
+            document.getElementById('results-count').textContent = `عرض ${filtered.length} صفقة`;
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-12 text-center bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6 space-y-2">
+                        <i class="fa-solid fa-magnifying-glass text-2xl text-slate-500"></i>
+                        <p class="text-sm font-bold text-slate-300">لا توجد عروض مطابقة لبحثك حالياً.</p>
+                        <p class="text-xs text-slate-400">جرب البحث بكلمة أخرى أو اختر "كل المحافظات".</p>
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(d => {
+                const prod = escapeHtml(d.product_name);
+                const price = escapeHtml(d.price);
+                const curr = escapeHtml(d.currency);
+                const area = escapeHtml(d.area);
+                const timeTxt = escapeHtml(d.post_time_text);
+                const tgUrl = `https://t.me/gaza_safaqat_bot?start=deal_${d.id}`;
+
+                return `
+                <article class="bg-slate-800/75 border border-slate-700/80 hover:border-emerald-500/50 rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-lg transition">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between gap-2 text-[11px]">
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-emerald-300 font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-location-dot"></i>
+                                ${area}
+                            </span>
+                            <span class="text-slate-400 font-semibold">${timeTxt}</span>
+                        </div>
+
+                        <div class="flex items-start justify-between gap-3 pt-1">
+                            <h4 class="text-base sm:text-lg font-black text-white leading-snug">${prod}</h4>
+                            <div class="shrink-0 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-black text-base whitespace-nowrap">
+                                ${price} <span class="text-xs font-bold">${curr}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 pt-2 border-t border-slate-700/60">
+                        <div class="px-3 py-2 rounded-xl bg-slate-900/75 border border-slate-700/60 text-xs text-slate-400 flex items-center gap-2">
+                            <i class="fa-solid fa-lock text-amber-400"></i>
+                            <span>اسم المحل، العنوان الدقيق، ورقم التاجر</span>
+                        </div>
+                        <a href="${tgUrl}" target="_blank" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-sky-600/20 transition">
+                            <i class="fa-solid fa-unlock-keyhole"></i>
+                            <span>كشف اسم المحل والتفاصيل مجاناً</span>
+                        </a>
+                    </div>
+                </article>`;
+            }).join('');
+        }
+
+        document.addEventListener('DOMContentLoaded', loadPublicDeals);
+    </script>
+</body>
+</html>

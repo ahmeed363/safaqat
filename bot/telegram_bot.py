@@ -322,6 +322,66 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_main_menu_keyboard(is_admin=is_admin)
     )
 
+    # معالجة الروابط العميقة القادمة من صفحة العروض العامة أو القناة (?start=deal_123)
+    start_param = context.args[0].strip() if getattr(context, "args", None) else ""
+    if start_param.startswith("deal_"):
+        deal_id_str = start_param.split("deal_", 1)[1]
+        if deal_id_str.isdigit():
+            deal_id = int(deal_id_str)
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                SELECT d.*, s.name as store_name, s.url as store_url
+                FROM deals d
+                LEFT JOIN stores s ON d.store_id = s.id
+                WHERE d.id = ?
+                """, (deal_id,))
+                row = cursor.fetchone()
+            if row:
+                deal = dict(row)
+                unlocked_card = "🔓 **تم كشف تفاصيل المتجر والموقع بنجاح:**\n\n" + render_deal_card(deal, is_admin=is_admin, compact=False)
+                btns = []
+                if deal.get("image_url"):
+                    btns.append([InlineKeyboardButton("🖼️ معاينة صورة الإعلان الأصلية", callback_data=f"deal_photo:{deal_id}")])
+                markup = InlineKeyboardMarkup(btns) if btns else None
+                try:
+                    await update.message.reply_text(
+                        unlocked_card,
+                        parse_mode="Markdown",
+                        protect_content=True,
+                        disable_web_page_preview=True,
+                        reply_markup=markup
+                    )
+                except Exception:
+                    await update.message.reply_text(
+                        unlocked_card.replace("*", "").replace("`", ""),
+                        protect_content=True,
+                        disable_web_page_preview=True,
+                        reply_markup=markup
+                    )
+    elif start_param in ("channel_teaser", "web_offers_bar"):
+        # عرض أحدث 3 لقطات حية مباشرة للقادمين من الويب أو القناة لتجربة فورية سريعة
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT d.*, s.name as store_name, s.url as store_url
+            FROM deals d
+            LEFT JOIN stores s ON d.store_id = s.id
+            WHERE d.is_bargain = 1
+            ORDER BY COALESCE(d.creation_time, 0) DESC, d.id DESC
+            LIMIT 3
+            """)
+            hot_deals = [dict(r) for r in cursor.fetchall()]
+        if hot_deals:
+            await update.message.reply_text("🔥 **أحدث 3 لقطات رصدها الرادار الآن:**", parse_mode="Markdown")
+            for d in hot_deals:
+                card = render_deal_card(d, is_admin=is_admin, compact=True)
+                btn = InlineKeyboardMarkup([[InlineKeyboardButton("👁️ عرض تفاصيل المتجر والموقع", callback_data=f"deal_expand:{d['id']}")]])
+                try:
+                    await update.message.reply_text(card, parse_mode="Markdown", protect_content=True, disable_web_page_preview=True, reply_markup=btn)
+                except Exception:
+                    await update.message.reply_text(card.replace("*", "").replace("`", ""), protect_content=True, disable_web_page_preview=True, reply_markup=btn)
+
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض القائمة الرئيسية"""
     chat_id = str(update.effective_chat.id)
