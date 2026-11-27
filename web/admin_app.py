@@ -503,6 +503,26 @@ async def send_digest_to_telegram(payload: DigestSendPayload, _: bool = Depends(
 
     return {"status": "ok", "message": "تم إرسال صورة النشرة والنص إلى تليجرام الإدارة بنجاح! 🚀"}
 
+@app.post("/api/digest/publish_facebook")
+async def publish_digest_to_facebook(payload: DigestSendPayload, _: bool = Depends(require_admin)):
+    """نشر صورة النشرة اليومية المصممة + النص مباشرة على صفحة فيسبوك الرسمية"""
+    import base64
+    from core.facebook_publisher import facebook_publisher
+
+    raw_b64 = payload.image_base64.split(",", 1)[-1].strip()
+    try:
+        img_bytes = base64.b64decode(raw_b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="صيغة الصورة غير صالحة")
+
+    res = facebook_publisher.publish_photo_post(
+        image_bytes=img_bytes,
+        caption=payload.caption or "📰 نشرة عروض أسواق غزة اليومية ⚡"
+    )
+    if not res.get("ok"):
+        raise HTTPException(status_code=400, detail=res.get("error", "تعذر النشر على فيسبوك"))
+    return {"status": "ok", "message": res.get("message"), "post_id": res.get("post_id")}
+
 @app.get("/api/stores")
 async def get_stores(_: bool = Depends(require_admin)):
     """جلب كافة المتاجر المعتمدة"""

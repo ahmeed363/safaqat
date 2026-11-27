@@ -443,6 +443,19 @@ class DailyDigestScheduler:
         slot_names = {10: "الصباحية ☀️", 15: "العصرية 🔥", 20: "المسائية 🌙"}
         slot_label = slot_names.get(slot_hour, f"الساعة {slot_hour}:00")
 
+        # إذا تم ضبط صفحة فيسبوك (FB_PAGE_ID & FB_PAGE_ACCESS_TOKEN) ننشر تلقائياً على صفحة فيسبوك!
+        fb_note = ""
+        try:
+            from core.facebook_publisher import facebook_publisher
+            if facebook_publisher.is_configured:
+                fb_res = facebook_publisher.publish_photo_post(img_bytes, caption)
+                if fb_res.get("ok"):
+                    fb_note = f"\n📘 **فيسبوك:** تم النشر التلقائي على صفحتك بنجاح ✅ (ID: `{fb_res.get('post_id')}`)"
+                else:
+                    fb_note = f"\n⚠️ **فيسبوك:** تعذر النشر الآلي ({fb_res.get('error')})"
+        except Exception as fb_ex:
+            fb_note = f"\n⚠️ **فيسبوك:** خطأ أثناء النشر ({fb_ex})"
+
         req = HTTPXRequest(read_timeout=30.0, connect_timeout=15.0)
         async with Bot(token=token, request=req) as bot:
             await bot.send_photo(
@@ -452,7 +465,8 @@ class DailyDigestScheduler:
             )
             await bot.send_message(
                 chat_id=str(admin_id),
-                text=f"🤖 **تم تجهيز النشرة {slot_label} تلقائياً!**\nالصورة والنص أعلاه جاهزان للنسخ والمشاركة مباشرة على صفحة فيسبوك ومجموعات واتساب ⚡"
+                text=f"🤖 **تم تجهيز النشرة {slot_label} تلقائياً!**{fb_note}\nالصورة والنص أعلاه جاهزان للنسخ والمشاركة مباشرة في المجموعات وواتساب ⚡",
+                parse_mode="Markdown"
             )
         print(f"[DigestScheduler] ✅ تم إرسال النشرة المجدولة للساعة {slot_hour}:00 بصيغة #{format_idx}")
         return True

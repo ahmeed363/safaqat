@@ -30,6 +30,11 @@ class Settings:
     DIGEST_AUTO_ENABLED: bool = os.getenv("DIGEST_AUTO_ENABLED", "true").lower() in ("true", "1", "yes")
     DIGEST_SCHEDULE_HOURS: str = os.getenv("DIGEST_SCHEDULE_HOURS", "10,15,20")
 
+    # إعدادات النشر التلقائي على صفحة فيسبوك (Facebook Graph API)
+    FB_PAGE_ID: str = os.getenv("FB_PAGE_ID", "")
+    FB_PAGE_ACCESS_TOKEN: str = os.getenv("FB_PAGE_ACCESS_TOKEN", "")
+    FB_LINK_IN_FIRST_COMMENT: bool = os.getenv("FB_LINK_IN_FIRST_COMMENT", "true").lower() in ("true", "1", "yes")
+
     # إعدادات فترات العمل الآلي
     MONITOR_INTERVAL_MINUTES: int = int(os.getenv("MONITOR_INTERVAL_MINUTES", "15"))
     DISCOVERY_INTERVAL_HOURS: int = int(os.getenv("DISCOVERY_INTERVAL_HOURS", "6"))

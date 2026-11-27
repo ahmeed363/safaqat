@@ -577,14 +577,18 @@
                     <div class="bg-slate-950 rounded-2xl p-2 border border-slate-700 flex items-center justify-center">
                         <canvas id="digest-canvas" width="1080" height="1080" class="w-full max-w-[440px] aspect-square rounded-xl shadow-lg"></canvas>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="downloadDigestPoster()" class="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-md">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button onclick="downloadDigestPoster()" class="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-md">
                             <i class="fa-solid fa-download"></i>
-                            تحميل الصورة (1080×1080)
+                            تحميل الصورة
                         </button>
-                        <button onclick="sendDigestToTelegram()" id="btn-send-digest-tg" class="py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-md">
+                        <button onclick="sendDigestToTelegram()" id="btn-send-digest-tg" class="py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-md">
                             <i class="fa-brands fa-telegram"></i>
-                            إرسال لتليجرام الإدارة
+                            إرسال لتليجرام
+                        </button>
+                        <button onclick="publishDigestToFacebook()" id="btn-send-digest-fb" class="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-md">
+                            <i class="fa-brands fa-facebook"></i>
+                            نشر ع الفيس الآن
                         </button>
                     </div>
                 </div>
@@ -1580,7 +1584,35 @@ https://safaqat-pi7r.onrender.com/gaza
                 alert('خطأ: ' + e.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-brands fa-telegram"></i> إرسال لتليجرام الإدارة';
+                btn.innerHTML = '<i class="fa-brands fa-telegram"></i> إرسال لتليجرام';
+            }
+        }
+
+        async function publishDigestToFacebook() {
+            const btn = document.getElementById('btn-send-digest-fb');
+            const canvas = document.getElementById('digest-canvas');
+            const caption = document.getElementById('digest-caption-box').value;
+            const imgB64 = canvas.toDataURL('image/jpeg', 0.90);
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري النشر...';
+            try {
+                const res = await fetch('/api/digest/publish_facebook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_base64: imgB64, caption })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert('✅ ' + data.message);
+                } else {
+                    alert('تنبيه فيسبوك:\n' + (data.detail || 'تأكد من ضبط FB_PAGE_ID و FB_PAGE_ACCESS_TOKEN في Render'));
+                }
+            } catch (e) {
+                alert('خطأ: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-brands fa-facebook"></i> نشر ع الفيس الآن';
             }
         }
 
