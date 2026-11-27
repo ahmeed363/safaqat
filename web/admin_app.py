@@ -154,6 +154,10 @@ class StoreUpdatePayload(BaseModel):
 class BroadcastPayload(BaseModel):
     message: str
 
+class DigestSendPayload(BaseModel):
+    image_base64: str
+    caption: Optional[str] = ""
+
 # --- Web Endpoints ---
 
 @app.get("/login", response_class=HTMLResponse)
@@ -465,6 +469,112 @@ async def test_custom_deal_endpoint(payload: CustomTestDealPayload, _: bool = De
             )
 
     return {"status": "ok", "message": f"تم إرسال التجربة لـ ({payload.product_name}) بنجاح إلى تليجرام الإدارة! 🚀"}
+
+@app.get("/api/digest")
+async def get_daily_digest(_: bool = Depends(require_admin)):
+    """توليد قائمة متنوعة من أقوى وأرخص عروض اليوم مع نص منشور جاهز لفيسبوك وواتساب"""
+    from core.ai_evaluator import is_invalid_product_name
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+        now_gaza = datetime.now(ZoneInfo("Asia/Gaza"))
+    except Exception:
+        now_gaza = datetime.now()
+
+    months_ar = {
+        1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل", 5: "مايو", 6: "يونيو",
+        7: "يوليو", 8: "أغسطس", 9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر"
+    }
+    date_ar = f"{now_gaza.day} {months_ar.get(now_gaza.month, '')} {now_gaza.year}"
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM stores WHERE is_verified = 1")
+        stores_count = cursor.fetchone()[0]
+        cursor.execute("""
+        SELECT d.id, d.product_name, d.price, d.currency, d.location, d.post_time_text, d.creation_time,
+               s.name as store_name, s.city_area as store_area, COALESCE(s.is_partner, 0) as is_partner
+        FROM deals d
+        LEFT JOIN stores s ON d.store_id = s.id
+        WHERE d.is_bargain = 1 AND d.price > 0
+        ORDER BY
+            CASE
+                WHEN d.post_time_text LIKE 'اليوم%' THEN 1
+                WHEN d.post_time_text LIKE 'أمس%' THEN 2
+                ELSE 3
+            END ASC,
+            COALESCE(s.is_partner, 0) DESC,
+            COALESCE(d.creation_time, 0) DESC,
+            d.id DESC
+        LIMIT 80
+        """)
+        rows = [dict(r) for r in cursor.fetchall()]
+
+    candidates = []
+    seen_prefixes = set()
+    for r in rows:
+        p_name = str(r.get("product_name") or "").strip()
+        if is_invalid_product_name(p_name) or len(p_name) < 3:
+            continue
+        # تفادي تكرار نفس السلعة (مثلاً 4 أنواع جبنة متتالية) لضمان تنوع النشرة
+        first_word = p_name.split()[0]
+        if first_word in seen_prefixes and len(candidates) < 12:
+            continue
+        seen_prefixes.add(first_word)
+
+        curr_raw = str(r.get("currency") or "ILS").upper()
+        curr_label = "شيكل" if curr_raw in ("ILS", "NIS", "SHEKEL", "شيكل") else ("$" if curr_raw in ("USD", "دولار") else curr_raw)
+        try:
+            p_val = float(r.get("price", 0))
+            p_str = str(int(p_val)) if p_val.is_integer() else f"{p_val:.1f}".rstrip("0").rstrip(".")
+        except Exception:
+            p_str = str(r.get("price", ""))
+
+        candidates.append({
+            "id": r["id"],
+            "product_name": p_name[:34],
+            "price": p_str,
+            "currency": curr_label,
+            "area": _extract_general_area(r.get("location", ""), r.get("store_area", "")),
+            "store_name": r.get("store_name") or "",
+            "is_partner": bool(r.get("is_partner", 0)),
+        })
+        if len(candidates) >= 18:
+            break
+
+    return {
+        "date_ar": date_ar,
+        "stores_count": stores_count,
+        "candidates": candidates,
+    }
+
+@app.post("/api/digest/send_telegram")
+async def send_digest_to_telegram(payload: DigestSendPayload, _: bool = Depends(require_admin)):
+    """إرسال صورة النشرة اليومية المصممة + النص الجاهز إلى تليجرام الإدارة"""
+    import base64
+    import io
+    from telegram.request import HTTPXRequest
+
+    token = settings.TELEGRAM_BOT_TOKEN
+    admin_id = settings.ADMIN_TELEGRAM_ID
+    if not token or not admin_id:
+        raise HTTPException(status_code=500, detail="إعدادات التليجرام غير مكتملة")
+
+    raw_b64 = payload.image_base64.split(",", 1)[-1].strip()
+    try:
+        img_bytes = base64.b64decode(raw_b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="صيغة الصورة غير صالحة")
+
+    req = HTTPXRequest(read_timeout=30.0, connect_timeout=15.0)
+    async with Bot(token=token, request=req) as bot:
+        await bot.send_photo(
+            chat_id=str(admin_id),
+            photo=io.BytesIO(img_bytes),
+            caption=(payload.caption or "📰 نشرة عروض أسواق غزة اليومية ⚡")[:1024]
+        )
+
+    return {"status": "ok", "message": "تم إرسال صورة النشرة والنص إلى تليجرام الإدارة بنجاح! 🚀"}
 
 @app.get("/api/stores")
 async def get_stores(_: bool = Depends(require_admin)):

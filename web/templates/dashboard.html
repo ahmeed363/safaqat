@@ -165,6 +165,10 @@
                         <option value="خانيونس">خانيونس</option>
                         <option value="رفح">رفح والمواصي</option>
                     </select>
+                    <button onclick="openDigestModal()" class="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs flex items-center gap-2 transition shadow-md shadow-amber-500/20 whitespace-nowrap">
+                        <i class="fa-solid fa-newspaper"></i>
+                        نشرة عروض اليوم
+                    </button>
                     <button onclick="openCustomTestModal()" class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-2 transition shadow-sm whitespace-nowrap">
                         <i class="fa-solid fa-paper-plane"></i>
                         تجربة صفقة جديدة
@@ -550,6 +554,65 @@
                     <i class="fa-solid fa-check"></i>
                     حفظ التعديلات
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DAILY DIGEST POSTER MODAL -->
+    <div id="digest-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 hidden overflow-y-auto">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-5xl w-full p-5 sm:p-6 space-y-5 shadow-2xl my-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h3 class="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    <i class="fa-solid fa-newspaper text-amber-400"></i>
+                    مولّد نشرة وصورة أرخص عروض اليوم (جاهزة لفيسبوك وواتساب والقناة)
+                </h3>
+                <button onclick="closeDigestModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                <!-- Poster Canvas Preview -->
+                <div class="space-y-3">
+                    <div class="bg-slate-950 rounded-2xl p-2 border border-slate-700 flex items-center justify-center">
+                        <canvas id="digest-canvas" width="1080" height="1080" class="w-full max-w-[440px] aspect-square rounded-xl shadow-lg"></canvas>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="downloadDigestPoster()" class="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-md">
+                            <i class="fa-solid fa-download"></i>
+                            تحميل الصورة (1080×1080)
+                        </button>
+                        <button onclick="sendDigestToTelegram()" id="btn-send-digest-tg" class="py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-md">
+                            <i class="fa-brands fa-telegram"></i>
+                            إرسال لتليجرام الإدارة
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Controls & Caption -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-300">العروض المعروضة في الصورة (اضغط لتبديل التشكيلة):</span>
+                        <button onclick="shuffleDigestDeals()" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 text-xs font-bold transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-shuffle"></i>
+                            تبديل العروض
+                        </button>
+                    </div>
+                    <div id="digest-deals-chips" class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 bg-slate-900/70 rounded-xl border border-slate-700">
+                        <!-- Checkboxes populated by JS -->
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-300">نص المنشور الجاهز للنسخ:</label>
+                            <button onclick="copyDigestCaption()" id="btn-copy-digest" class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center gap-1.5">
+                                <i class="fa-regular fa-copy"></i>
+                                نسخ النص
+                            </button>
+                        </div>
+                        <textarea id="digest-caption-box" rows="9" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-100 leading-relaxed focus:outline-none focus:border-amber-400"></textarea>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1160,6 +1223,336 @@
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> إرسال البث الآن`;
+            }
+        }
+
+        // ======================================================================
+        // DAILY DIGEST INFOGRAPHIC POSTER GENERATOR
+        // ======================================================================
+        let digestCandidates = [];
+        let selectedDigestIds = [];
+        let digestDateAr = '';
+        let digestStoresCount = 100;
+
+        async function openDigestModal() {
+            document.getElementById('digest-modal').classList.remove('hidden');
+            try {
+                const res = await fetch('/api/digest');
+                const data = await res.json();
+                digestCandidates = data.candidates || [];
+                digestDateAr = data.date_ar || 'اليوم';
+                digestStoresCount = data.stores_count || 100;
+                selectedDigestIds = digestCandidates.slice(0, 6).map(d => d.id);
+                renderDigestChips();
+                updateDigestCaption();
+                await renderDigestPoster();
+            } catch (e) {
+                alert('تعذر جلب عروض النشرة: ' + e.message);
+            }
+        }
+
+        function closeDigestModal() {
+            document.getElementById('digest-modal').classList.add('hidden');
+        }
+
+        function renderDigestChips() {
+            const box = document.getElementById('digest-deals-chips');
+            box.innerHTML = digestCandidates.map(d => {
+                const active = selectedDigestIds.includes(d.id);
+                return `
+                <button onclick="toggleDigestDeal(${d.id})" class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${active ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'}">
+                    ${d.product_name} (${d.price} ${d.currency})
+                </button>`;
+            }).join('');
+        }
+
+        async function toggleDigestDeal(id) {
+            if (selectedDigestIds.includes(id)) {
+                if (selectedDigestIds.length <= 1) return;
+                selectedDigestIds = selectedDigestIds.filter(x => x !== id);
+            } else {
+                if (selectedDigestIds.length >= 6) {
+                    selectedDigestIds.shift();
+                }
+                selectedDigestIds.push(id);
+            }
+            renderDigestChips();
+            updateDigestCaption();
+            await renderDigestPoster();
+        }
+
+        async function shuffleDigestDeals() {
+            if (digestCandidates.length <= 6) return;
+            const pool = [...digestCandidates].sort(() => Math.random() - 0.5);
+            selectedDigestIds = pool.slice(0, 6).map(d => d.id);
+            renderDigestChips();
+            updateDigestCaption();
+            await renderDigestPoster();
+        }
+
+        function getSelectedDigestDeals() {
+            return selectedDigestIds
+                .map(id => digestCandidates.find(d => d.id === id))
+                .filter(Boolean);
+        }
+
+        function updateDigestCaption() {
+            const deals = getSelectedDigestDeals();
+            const lines = deals.map(d => `🔹 ${d.product_name}: ${d.price} ${d.currency} (${d.area})`);
+            const text =
+`📢 نشرة أسعار وعروض اليوم في أسواق غزة (${digestDateAr}) 🛒⚡
+
+رصد حي من أكثر من ${digestStoresCount} سوبرماركت ومول بالقطاع:
+${lines.join('\n')}
+
+🔍 لمعرفة أسماء المحلات والمواقع وأرقام التجار والبحث عن أي سلعة أخرى مجاناً 👇
+
+🌐 دليل الأسعار الحي (افتح مباشرة):
+https://safaqat-pi7r.onrender.com/gaza
+
+📲 أو تابعنا على قناة تليجرام:
+@gaza_safaqat`;
+            document.getElementById('digest-caption-box').value = text;
+        }
+
+        function drawRoundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+        }
+
+        function wrapCanvasLines(ctx, text, maxWidth, maxLines = 2) {
+            const words = (text || '').split(/\s+/);
+            const lines = [];
+            let current = '';
+            for (const w of words) {
+                const test = current ? current + ' ' + w : w;
+                if (ctx.measureText(test).width <= maxWidth) {
+                    current = test;
+                } else {
+                    if (current) lines.push(current);
+                    current = w;
+                    if (lines.length >= maxLines) break;
+                }
+            }
+            if (current && lines.length < maxLines) lines.push(current);
+            return lines;
+        }
+
+        async function renderDigestPoster() {
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+            const canvas = document.getElementById('digest-canvas');
+            const ctx = canvas.getContext('2d');
+            const W = 1080, H = 1080;
+
+            // 1. Deep Studio Radial Background
+            const bgGrad = ctx.createRadialGradient(W / 2, 320, 40, W / 2, H / 2, 850);
+            bgGrad.addColorStop(0, '#073b2f');
+            bgGrad.addColorStop(0.5, '#071728');
+            bgGrad.addColorStop(1, '#030812');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, W, H);
+
+            // 2. Subtle Glowing Radar Rings
+            ctx.save();
+            [160, 280, 400, 520].forEach((rad, i) => {
+                ctx.beginPath();
+                ctx.arc(W / 2, 210, rad, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(16, 185, 129, ${0.14 - i * 0.025})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+            ctx.restore();
+
+            ctx.direction = 'rtl';
+
+            // 3. Top Badges (Brand & Date)
+            // Right Brand Pill
+            drawRoundRect(ctx, W - 360, 42, 304, 54, 27);
+            ctx.fillStyle = 'rgba(6, 78, 59, 0.85)';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(52, 211, 153, 0.7)';
+            ctx.stroke();
+
+            ctx.fillStyle = '#a7f3d0';
+            ctx.font = '800 22px Cairo, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('⚡ رادار صفقات غزة', W - 208, 77);
+
+            // Left Date Pill
+            drawRoundRect(ctx, 56, 42, 290, 54, 27);
+            const goldGrad = ctx.createLinearGradient(56, 42, 346, 96);
+            goldGrad.addColorStop(0, '#f59e0b');
+            goldGrad.addColorStop(1, '#fbbf24');
+            ctx.fillStyle = goldGrad;
+            ctx.fill();
+
+            ctx.fillStyle = '#0f172a';
+            ctx.font = '900 22px Cairo, sans-serif';
+            ctx.fillText(`📅 ${digestDateAr}`, 201, 77);
+
+            // 4. Main Headline
+            ctx.textAlign = 'center';
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 18;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '900 54px Cairo, sans-serif';
+            ctx.fillText('نشرة أرخص عروض اليوم في غزة', W / 2, 168);
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = '#fde047';
+            ctx.font = '700 26px Cairo, sans-serif';
+            ctx.fillText(`رصد حي من أكثر من ${digestStoresCount} متجر وسوبرماركت • قبل ما تنزل السوق 🛒`, W / 2, 218);
+
+            // 5. 6 Deal Cards Grid (2 Columns x 3 Rows)
+            const deals = getSelectedDigestDeals();
+            const cardW = 470, cardH = 182, gapX = 28, gapY = 22;
+            const startX = 56, startY = 258;
+
+            deals.forEach((deal, idx) => {
+                const col = idx % 2; // 0 right-col visually in RTL? place col 0 on right for natural RTL reading
+                const row = Math.floor(idx / 2);
+                const x = col === 0 ? (W - startX - cardW) : startX;
+                const y = startY + row * (cardH + gapY);
+
+                // Card Glass Box
+                drawRoundRect(ctx, x, y, cardW, cardH, 22);
+                ctx.fillStyle = deal.is_partner ? 'rgba(30, 41, 59, 0.92)' : 'rgba(15, 23, 42, 0.88)';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = deal.is_partner ? 'rgba(251, 191, 36, 0.7)' : 'rgba(52, 211, 153, 0.35)';
+                ctx.stroke();
+
+                // Right Accent Bar
+                drawRoundRect(ctx, x + cardW - 10, y + 24, 6, cardH - 48, 3);
+                ctx.fillStyle = deal.is_partner ? '#fbbf24' : '#10b981';
+                ctx.fill();
+
+                // Area Tag (Top Right inside card)
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#6ee7b7';
+                ctx.font = '700 18px Cairo, sans-serif';
+                ctx.fillText(`📍 ${deal.area}${deal.is_partner ? '  ⭐ شريك' : ''}`, x + cardW - 26, y + 36);
+
+                // Product Name (up to 2 lines)
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '900 26px Cairo, sans-serif';
+                const pLines = wrapCanvasLines(ctx, deal.product_name, cardW - 205, 2);
+                pLines.forEach((ln, li) => {
+                    ctx.fillText(ln, x + cardW - 26, y + 82 + li * 36);
+                });
+
+                // Price Pill (Left side of card)
+                const pillW = 148, pillH = 74;
+                const px = x + 20, py = y + (cardH - pillH) / 2 + 8;
+                drawRoundRect(ctx, px, py, pillW, pillH, 18);
+                const pGrad = ctx.createLinearGradient(px, py, px + pillW, py + pillH);
+                pGrad.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
+                pGrad.addColorStop(1, 'rgba(5, 150, 105, 0.35)');
+                ctx.fillStyle = pGrad;
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#34d399';
+                ctx.stroke();
+
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#fde047';
+                ctx.font = '900 32px Cairo, sans-serif';
+                ctx.fillText(`${deal.price}`, px + pillW / 2, py + 38);
+                ctx.fillStyle = '#e2e8f0';
+                ctx.font = '800 17px Cairo, sans-serif';
+                ctx.fillText(`${deal.currency}`, px + pillW / 2, py + 62);
+            });
+
+            // 6. Bottom CTA Banner
+            const ctaY = 880, ctaH = 152;
+            drawRoundRect(ctx, 56, ctaY, W - 112, ctaH, 26);
+            const ctaGrad = ctx.createLinearGradient(56, ctaY, W - 56, ctaY + ctaH);
+            ctaGrad.addColorStop(0, 'rgba(6, 78, 59, 0.95)');
+            ctaGrad.addColorStop(1, 'rgba(15, 23, 42, 0.97)');
+            ctx.fillStyle = ctaGrad;
+            ctx.fill();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#10b981';
+            ctx.stroke();
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '800 25px Cairo, sans-serif';
+            ctx.fillText('🔒 أسماء المحلات والمواقع وأرقام التجار متوفرة مجاناً الآن:', W / 2, ctaY + 46);
+
+            // Web Pill (Right)
+            drawRoundRect(ctx, 520, ctaY + 70, 470, 58, 16);
+            ctx.fillStyle = '#059669';
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '900 22px Cairo, sans-serif';
+            ctx.direction = 'ltr';
+            ctx.fillText('safaqat-pi7r.onrender.com/gaza', 755, ctaY + 106);
+
+            // Telegram Pill (Left)
+            drawRoundRect(ctx, 90, ctaY + 70, 405, 58, 16);
+            ctx.fillStyle = '#0284c7';
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '900 24px Cairo, sans-serif';
+            ctx.fillText('Telegram: @gaza_safaqat', 292, ctaY + 107);
+            ctx.direction = 'rtl';
+        }
+
+        function downloadDigestPoster() {
+            const canvas = document.getElementById('digest-canvas');
+            const link = document.createElement('a');
+            link.download = `safaqat-offers-${new Date().toISOString().slice(0, 10)}.jpg`;
+            link.href = canvas.toDataURL('image/jpeg', 0.93);
+            link.click();
+        }
+
+        async function copyDigestCaption() {
+            const text = document.getElementById('digest-caption-box').value;
+            try {
+                await navigator.clipboard.writeText(text);
+                const btn = document.getElementById('btn-copy-digest');
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> تم النسخ!';
+                setTimeout(() => { btn.innerHTML = '<i class="fa-regular fa-copy"></i> نسخ النص'; }, 2000);
+            } catch (e) {
+                document.getElementById('digest-caption-box').select();
+                document.execCommand('copy');
+            }
+        }
+
+        async function sendDigestToTelegram() {
+            const btn = document.getElementById('btn-send-digest-tg');
+            const canvas = document.getElementById('digest-canvas');
+            const caption = document.getElementById('digest-caption-box').value;
+            const imgB64 = canvas.toDataURL('image/jpeg', 0.90);
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الإرسال...';
+            try {
+                const res = await fetch('/api/digest/send_telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_base64: imgB64, caption })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert('✅ ' + data.message);
+                } else {
+                    alert('خطأ: ' + (data.detail || 'تعذر الإرسال'));
+                }
+            } catch (e) {
+                alert('خطأ: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-brands fa-telegram"></i> إرسال لتليجرام الإدارة';
             }
         }
 
