@@ -603,12 +603,18 @@
                     </div>
 
                     <div class="space-y-1.5">
-                        <div class="flex items-center justify-between">
-                            <label class="text-xs font-bold text-slate-300">نص المنشور الجاهز للنسخ:</label>
-                            <button onclick="copyDigestCaption()" id="btn-copy-digest" class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center gap-1.5">
-                                <i class="fa-regular fa-copy"></i>
-                                نسخ النص
-                            </button>
+                        <div class="flex items-center justify-between gap-2">
+                            <label class="text-xs font-bold text-slate-300">نص المنشور (<span id="digest-format-name" class="text-amber-400">نشرة الصباح</span>):</label>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="cycleDigestFormat()" class="px-2.5 py-1 rounded-lg bg-sky-600/20 hover:bg-sky-600 text-sky-300 hover:text-white text-xs font-bold transition flex items-center gap-1">
+                                    <i class="fa-solid fa-arrows-rotate"></i>
+                                    تغيير الصيغة
+                                </button>
+                                <button onclick="copyDigestCaption()" id="btn-copy-digest" class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center gap-1.5">
+                                    <i class="fa-regular fa-copy"></i>
+                                    نسخ النص
+                                </button>
+                            </div>
                         </div>
                         <textarea id="digest-caption-box" rows="9" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-100 leading-relaxed focus:outline-none focus:border-amber-400"></textarea>
                     </div>
@@ -1296,23 +1302,45 @@
                 .filter(Boolean);
         }
 
+        let digestFormatIdx = 0;
+        const DIGEST_FORMAT_NAMES = [
+            "نشرة الصباح ☀️",
+            "مقارنة وتوفير 🛒",
+            "حرق الأسعار 🔥",
+            "توفير العائلة 🏠",
+            "جولة الأسعار 📍",
+            "ملخص المساء 🌙"
+        ];
+
+        function cycleDigestFormat() {
+            digestFormatIdx = (digestFormatIdx + 1) % DIGEST_FORMAT_NAMES.length;
+            updateDigestCaption();
+        }
+
         function updateDigestCaption() {
             const deals = getSelectedDigestDeals();
-            const lines = deals.map(d => `🔹 ${d.product_name}: ${d.price} ${d.currency} (${d.area})`);
-            const text =
-`📢 نشرة أسعار وعروض اليوم في أسواق غزة (${digestDateAr}) 🛒⚡
-
-رصد حي من أكثر من ${digestStoresCount} سوبرماركت ومول بالقطاع:
-${lines.join('\n')}
-
-🔍 لمعرفة أسماء المحلات والمواقع وأرقام التجار والبحث عن أي سلعة أخرى مجاناً 👇
+            const lines = deals.map(d => `🔹 ${d.product_name}: ${d.price} ${d.currency} (${d.area})`).join('\n');
+            const footer =
+`🔍 لمعرفة أسماء المحلات والمواقع وأرقام التجار والبحث عن أي سلعة أخرى مجاناً 👇
 
 🌐 دليل الأسعار الحي (افتح مباشرة):
 https://safaqat-pi7r.onrender.com/gaza
 
 📲 أو تابعنا على قناة تليجرام:
 @gaza_safaqat`;
-            document.getElementById('digest-caption-box').value = text;
+
+            const headers = [
+                `☀️ يسعد صباحكم أهلنا في غزة 🌸 (${digestDateAr})\nقبل ما تنزلوا تشتروا أغراض البيت.. شوفوا أرخص الأسعار الحية من أكثر من ${digestStoresCount} متجراً:\n\n`,
+                `🛒 ليش تشتري بالغالي وفيه محل جنبك عامل سعر حرق؟ 🔥\nبعض أرخص الأسعار الحقيقية المرصودة اليوم في أسواق القطاع (${digestDateAr}):\n\n`,
+                `⚡ رصد عاجل لأقوى تخفيضات وسعر الحرق اليوم في غزة (${digestDateAr}) 💥\nتغطية مستمرة لأكثر من ${digestStoresCount} سوبرماركت ومول بالقطاع:\n\n`,
+                `🏠 لكل بيت في غزة حابب يوفر في مصروفه اليوم ❤️🛒\nجمعنالكم هذه الباقة من عروض اليوم الطازجة في محافظات القطاع (${digestDateAr}):\n\n`,
+                `📍 جولة سريعة على أسعار السلع في أسواق غزة الآن (${digestDateAr}) 👀⚡\nشوفوا الأسعار اللي لقيناها اليوم في مختلف المناطق:\n\n`,
+                `🌙 ملخص التوفير المسائي من رادار صفقات غزة (${digestDateAr}) ✨\nجهّز قائمة طلبات بكرة بأرخص سعر متوفر في أكثر من ${digestStoresCount} متجر:\n\n`
+            ];
+
+            const nameEl = document.getElementById('digest-format-name');
+            if (nameEl) nameEl.textContent = DIGEST_FORMAT_NAMES[digestFormatIdx];
+            document.getElementById('digest-caption-box').value = headers[digestFormatIdx] + lines + '\n\n' + footer;
         }
 
         function drawRoundRect(ctx, x, y, w, h, r) {

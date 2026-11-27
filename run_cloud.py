@@ -76,6 +76,14 @@ def main():
     monitor_thread = threading.Thread(target=run_monitor_worker, daemon=True)
     monitor_thread.start()
 
+    # 1.5 تشغيل مجدول المنشورات اليومية التلقائي (صباحاً، عصراً، مساءً بصيغ وتصاميم مختلفة)
+    try:
+        from core.digest_scheduler import digest_scheduler
+        digest_thread = threading.Thread(target=digest_scheduler.run_forever, daemon=True)
+        digest_thread.start()
+    except Exception as e:
+        print(f"[CloudMain] ⚠️ تعذر تشغيل مجدول النشرات: {e}")
+
     # 2. تشغيل سيرفر الويب وبوت التليجرام عبر lifespan
     port = int(os.environ.get("PORT", 8000))
     host = "0.0.0.0"

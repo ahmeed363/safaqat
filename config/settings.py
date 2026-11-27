@@ -26,6 +26,10 @@ class Settings:
     # وضع الإطلاق المجاني (إلغاء إظهار "اشتراك تجريبي" للمشتركين واستمرار البث مجاناً)
     FREE_LAUNCH_MODE: bool = os.getenv("FREE_LAUNCH_MODE", "true").lower() in ("true", "1", "yes")
 
+    # إعدادات جدولة المنشورات التلقائية اليومية (10 صباحاً، 3 عصراً، 8 مساءً بتوقيت غزة)
+    DIGEST_AUTO_ENABLED: bool = os.getenv("DIGEST_AUTO_ENABLED", "true").lower() in ("true", "1", "yes")
+    DIGEST_SCHEDULE_HOURS: str = os.getenv("DIGEST_SCHEDULE_HOURS", "10,15,20")
+
     # إعدادات فترات العمل الآلي
     MONITOR_INTERVAL_MINUTES: int = int(os.getenv("MONITOR_INTERVAL_MINUTES", "15"))
     DISCOVERY_INTERVAL_HOURS: int = int(os.getenv("DISCOVERY_INTERVAL_HOURS", "6"))
