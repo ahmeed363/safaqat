@@ -160,7 +160,7 @@ class DigestSendPayload(BaseModel):
 
 # --- Web Endpoints ---
 
-@app.get("/login", response_class=HTMLResponse)
+@app.api_route("/login", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def serve_login(request: Request):
     """عرض صفحة تسجيل الدخول إلى لوحة التحكم"""
     if is_authenticated(request):
@@ -221,7 +221,7 @@ async def logout_post():
     resp.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
     return resp
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def serve_dashboard(request: Request):
     """عرض صفحة لوحة تحكم الإدارة الرئيسية (محمية بتسجيل الدخول)"""
     if not is_authenticated(request):
@@ -232,8 +232,8 @@ async def serve_dashboard(request: Request):
         html_content = f.read()
     return HTMLResponse(content=html_content)
 
-@app.get("/gaza", response_class=HTMLResponse)
-@app.get("/offers", response_class=HTMLResponse)
+@app.api_route("/gaza", methods=["GET", "HEAD"], response_class=HTMLResponse)
+@app.api_route("/offers", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def serve_public_offers():
     """عرض الواجهة العامة المجانية لعروض اليوم في غزة (بوابة جذب المشتركين)"""
     if not os.path.exists(OFFERS_TEMPLATE_PATH):
@@ -309,7 +309,7 @@ async def get_public_deals(limit: int = Query(120, ge=10, le=200)):
 
 # --- API Endpoints ---
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health_status():
     """فحص سلامة السيرفر ومتغيرات البيئة السحابية (مفتوح لفحص Render Health Checks)"""
     import os
