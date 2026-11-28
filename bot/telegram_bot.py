@@ -334,6 +334,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # معالجة الروابط العميقة القادمة من صفحة العروض العامة أو القناة (?start=deal_123)
     start_param = context.args[0].strip() if getattr(context, "args", None) else ""
+    db.log_analytics_event("bot_visit", start_param or "direct", source=chat_id)
     if start_param.startswith("deal_"):
         deal_id_str = start_param.split("deal_", 1)[1]
         if deal_id_str.isdigit():
@@ -756,6 +757,7 @@ async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # توسيع بطاقة العرض وإظهار كامل التفاصيل
     if data.startswith("deal_expand:"):
         deal_id = int(data.split(":")[1])
+        db.log_analytics_event("bot_unlock", str(deal_id), source=chat_id)
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""

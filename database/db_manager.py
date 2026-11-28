@@ -650,7 +650,7 @@ class DatabaseManager:
             pass
 
     def get_analytics_summary(self, days: int = 7) -> Dict[str, Any]:
-        """ملخص أكثر كلمات البحث ومصادر الزيارات خلال آخر N أيام"""
+        """ملخص أكثر كلمات البحث، زيارات الموقع والبوت، وتفاصيل متابعي الأسعار خلال آخر N أيام"""
         since = f"-{int(days)} days"
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -676,6 +676,70 @@ class DatabaseManager:
             cursor.execute("SELECT COUNT(*) FROM price_watches")
             total_watches = cursor.fetchone()[0]
 
+            cursor.execute("""
+                SELECT pw.id, pw.chat_id, pw.keyword, pw.area_filter, pw.created_at,
+                       COALESCE(s.full_name, 'مشترك') AS full_name,
+                       COALESCE(s.username, '') AS username
+                FROM price_watches pw
+                LEFT JOIN subscribers s ON s.telegram_chat_id = pw.chat_id
+                ORDER BY pw.id DESC
+                LIMIT 50
+            """)
+            watches_details = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("""
+                SELECT COUNT(*) AS total, COUNT(DISTINCT source) AS unique_users
+                FROM analytics_events
+                WHERE event_type = 'bot_visit' AND created_at >= datetime('now', ?)
+            """, (since,))
+            bv_row = cursor.fetchone()
+            bot_visits_total = bv_row[0] if bv_row else 0
+            bot_unique_visitors = bv_row[1] if bv_row else 0
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM analytics_events
+                WHERE (event_type = 'bot_unlock' OR (event_type = 'bot_visit' AND value LIKE 'deal_%'))
+                  AND created_at >= datetime('now', ?)
+            """, (since,))
+            bot_unlocks = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT
+                    CASE
+                        WHEN value LIKE 'deal_%' THEN 'كشف عرض من /gaza'
+                        WHEN value = 'web_offers_bar' THEN 'شريط الاشتراك في /gaza'
+                        WHEN value = 'channel_teaser' THEN 'قناة @gaza_safaqat'
+                        WHEN value LIKE 'ref_%' THEN 'دعوة صديق'
+                        ELSE 'دخول مباشر للبوت'
+                    END AS ref_label,
+                    COUNT(*) AS cnt
+                FROM analytics_events
+                WHERE event_type = 'bot_visit' AND created_at >= datetime('now', ?)
+                GROUP BY ref_label
+                ORDER BY cnt DESC
+            """, (since,))
+            bot_visits_by_ref = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("""
+                SELECT ae.source AS chat_id, ae.value AS ref_param, ae.created_at,
+                       COALESCE(s.full_name, 'مشترك') AS full_name,
+                       COALESCE(s.username, '') AS username
+                FROM analytics_events ae
+                LEFT JOIN subscribers s ON s.telegram_chat_id = ae.source
+                WHERE ae.event_type = 'bot_visit' AND ae.created_at >= datetime('now', ?)
+                ORDER BY ae.id DESC
+                LIMIT 15
+            """, (since,))
+            recent_bot_visitors = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("""
+                SELECT COALESCE(NULLIF(source, ''), 'bot') AS src, COUNT(*) AS cnt
+                FROM analytics_events
+                WHERE event_type = 'search' AND created_at >= datetime('now', ?)
+                GROUP BY COALESCE(NULLIF(source, ''), 'bot')
+            """, (since,))
+            search_by_platform = {r[0]: r[1] for r in cursor.fetchall()}
+
             cursor.execute("SELECT COUNT(*) FROM merchant_submissions WHERE status = 'pending'")
             pending_submissions = cursor.fetchone()[0]
 
@@ -686,6 +750,13 @@ class DatabaseManager:
             "total_visits": sum(v["cnt"] for v in visits_by_source),
             "total_searches": sum(s["cnt"] for s in top_searches),
             "total_watches": total_watches,
+            "watches_details": watches_details,
+            "bot_visits_total": bot_visits_total,
+            "bot_unique_visitors": bot_unique_visitors,
+            "bot_unlocks": bot_unlocks,
+            "bot_visits_by_ref": bot_visits_by_ref,
+            "recent_bot_visitors": recent_bot_visitors,
+            "search_by_platform": search_by_platform,
             "pending_submissions": pending_submissions,
         }
 
