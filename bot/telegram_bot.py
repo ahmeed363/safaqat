@@ -150,7 +150,8 @@ def get_persistent_bottom_keyboard() -> ReplyKeyboardMarkup:
     """كيبورد سفلي دائم يسهل على أي مستخدم في غزة التنقل بلمسة واحدة دون كتابة أي أوامر"""
     keyboard = [
         [KeyboardButton("⚡ القائمة الرئيسية"), KeyboardButton("🔍 بحث فوري عن سلعة")],
-        [KeyboardButton("🌾 تموين وأساسيات"), KeyboardButton("🥩 لحوم ودواجن")]
+        [KeyboardButton("🌾 تموين وأساسيات"), KeyboardButton("🥩 لحوم ودواجن")],
+        [KeyboardButton("🔔 تنبيهات الأسعار الخاصة")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -187,7 +188,10 @@ def get_main_menu_keyboard(is_admin: bool = False) -> InlineKeyboardMarkup:
             InlineKeyboardButton("🔥 أحدث عروض اليوم (الكل)", callback_data="filter_all")
         ],
         [
-            InlineKeyboardButton("🎁 شارك مع أهلك وأصدقائك", callback_data="nav_share"),
+            InlineKeyboardButton("🔔 تنبيهات الأسعار الخاصة", callback_data="nav_watch"),
+            InlineKeyboardButton("🎁 شارك مع أهلك وأصدقائك", callback_data="nav_share")
+        ],
+        [
             InlineKeyboardButton("📢 قناة العروض اليومية", url="https://t.me/gaza_safaqat")
         ]
     ]
@@ -419,6 +423,68 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_main_menu_keyboard(is_admin=is_admin)
     )
 
+def _encode_watch_cb(kw: str) -> str:
+    """ترميز الكلمة المفتاحية بحيث لا يتجاوز callback_data حد 64 بايت في تليجرام"""
+    clean = str(kw or "").strip()
+    while len(("watch_add:" + clean).encode("utf-8")) > 60 and len(clean) > 2:
+        clean = clean[:-1].strip()
+    return f"watch_add:{clean}"
+
+
+def _build_watchlist_payload(chat_id: str) -> tuple[str, InlineKeyboardMarkup]:
+    """بناء رسالة وقائمة أزرار تنبيهات الأسعار الخاصة بالمشترك"""
+    watches = db.get_user_watches(chat_id)
+    if watches:
+        lines = [
+            "🔔 **قائمة تنبيهات الأسعار الخاصة بك:**\n",
+            "سيصلك إشعار فوري بمجرد رصد أي عرض أرخص لهذه السلع:\n",
+        ]
+        buttons = []
+        for w in watches:
+            area_txt = f" ({w['area_filter']})" if w.get("area_filter") and w["area_filter"] != "الكل" else ""
+            lines.append(f"• **{w['keyword']}**{area_txt}")
+            buttons.append([InlineKeyboardButton(f"🔕 إيقاف تنبيه: {w['keyword']}", callback_data=f"watch_del:{w['id']}")])
+        lines.append("\n➕ لإضافة سلعة جديدة، أرسل: `/watch اسم_السلعة`\nمثال: `/watch دجاج` أو `/watch زيت`")
+    else:
+        lines = [
+            "🔔 **خدمة تنبيهات الأسعار الخاصة (مجاناً):**\n",
+            "اختر أي سلعة تهمك (مثل: `دجاج`، `زيت`، `سكر`، `حليب`، `بامبرز`) وسينبهك البوت فوراً أول ما ينزل لها عرض جديد!\n",
+            "✍️ أرسل الآن: `/watch دجاج` (أو أي سلعة تريدها)\nأو اضغط أحد الخيارات السريعة بالأسفل:"
+        ]
+        buttons = [
+            [
+                InlineKeyboardButton("➕ دجاج", callback_data=_encode_watch_cb("دجاج")),
+                InlineKeyboardButton("➕ زيت", callback_data=_encode_watch_cb("زيت")),
+                InlineKeyboardButton("➕ سكر", callback_data=_encode_watch_cb("سكر")),
+            ],
+            [
+                InlineKeyboardButton("➕ حليب", callback_data=_encode_watch_cb("حليب")),
+                InlineKeyboardButton("➕ بامبرز", callback_data=_encode_watch_cb("بامبرز")),
+                InlineKeyboardButton("➕ جبنة", callback_data=_encode_watch_cb("جبنة")),
+            ],
+        ]
+    buttons.append([InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="nav_main")])
+    return "\n".join(lines), InlineKeyboardMarkup(buttons)
+
+
+async def watch_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إضافة أو استعراض تنبيهات السعر الخاصة بالمشترك: /watch دجاج"""
+    chat_id = str(update.effective_chat.id)
+    kw = " ".join(context.args).strip() if context.args else ""
+    if kw:
+        ok = db.add_price_watch(chat_id=chat_id, keyword=kw)
+        if ok:
+            await update.message.reply_text(
+                f"🔔 **تم تفعيل التنبيه بنجاح لـ:** `{kw}` ✅\nسيصلك إشعار فوري أول ما ينزل عرض جديد لهذه السلعة.",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text("⚠️ اكتب كلمة واضحة لاسم السلعة، مثال: `/watch دجاج`", parse_mode="Markdown")
+            return
+    text, kb = _build_watchlist_payload(chat_id)
+    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=kb)
+
+
 async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """الاستجابة لضغط أزرار التنقل والتصنيفات والمناطق"""
     query = update.callback_query
@@ -450,6 +516,32 @@ async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔍 **اكتب اسم السلعة أو المحل مباشرة في المحادثة:**\n(مثال: `جبنة`، `سكر`، `زيت`، `حليب`، `طلال عواد`، `دجاج`)\nوسأجلب لك أحدث العروض وأسعارها فوراً!",
             parse_mode="Markdown"
         )
+        return
+
+    if data == "nav_watch":
+        text, kb = _build_watchlist_payload(chat_id)
+        await query.message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
+        return
+
+    if data.startswith("watch_add:"):
+        kw = data.split(":", 1)[1].strip()
+        if db.add_price_watch(chat_id=chat_id, keyword=kw):
+            text, kb = _build_watchlist_payload(chat_id)
+            await query.answer(f"🔔 تم تفعيل التنبيه لـ: {kw}", show_alert=True)
+            try:
+                await query.message.reply_text(
+                    f"🔔 **تم تفعيل تنبيه السعر بنجاح لـ:** `{kw}` ✅\nستصلك رسالة فورية أول ما يرصد الرادار عرضاً جديداً لهذه السلعة.",
+                    parse_mode="Markdown"
+                )
+            except Exception:
+                pass
+        return
+
+    if data.startswith("watch_del:"):
+        wid = int(data.split(":", 1)[1])
+        db.remove_price_watch(chat_id=chat_id, watch_id=wid)
+        text, kb = _build_watchlist_payload(chat_id)
+        await query.message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
         return
 
     if data == "nav_share":
@@ -1016,6 +1108,7 @@ async def deals_search_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     chat_id = str(update.effective_chat.id)
     is_admin = (chat_id == str(settings.ADMIN_TELEGRAM_ID))
+    db.log_analytics_event("search", query_str, source="bot")
 
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -1051,9 +1144,13 @@ async def deals_search_command(update: Update, context: ContextTypes.DEFAULT_TYP
         deals = [dict(row) for row in cursor.fetchall()]
 
     if not deals:
+        watch_kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton(f"🔔 نبهني فور توفر: {query_str[:22]}", callback_data=_encode_watch_cb(query_str))
+        ]])
         await update.message.reply_text(
-            f"🔍 لم يتم العثور على صفقات تطابق: **{query_str}**.\nجرب كلمة أخرى مثل: `جبنة`، `زيت`، `حليب`، `سكر`.",
-            parse_mode="Markdown"
+            f"🔍 لم يتم العثور على صفقات تطابق: **{query_str}** حالياً.\nجرب كلمة أخرى مثل: `جبنة`، `زيت`، `حليب`، `سكر`، أو فعّل التنبيه الفوري أدناه:",
+            parse_mode="Markdown",
+            reply_markup=watch_kb
         )
         return
 
@@ -1081,6 +1178,14 @@ async def deals_search_command(update: Update, context: ContextTypes.DEFAULT_TYP
                 reply_markup=InlineKeyboardMarkup([[expand_btn]])
             )
 
+    await update.message.reply_text(
+        f"💡 هل تريد استلام تنبيه فوري بمجرد نزول عرض أرخص لـ **{query_str}**؟",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton(f"🔔 تفعيل تنبيه سعر لـ ({query_str[:22]})", callback_data=_encode_watch_cb(query_str))
+        ]])
+    )
+
 async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     الاستجابة لأي رسالة نصية يكتبها المستخدم واعتبارها بحثاً تلقائياً عن السلعة مباشرة
@@ -1107,6 +1212,10 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     elif text in ["🥩 لحوم ودواجن", "لحوم", "دواجن"]:
         context.args = ["دجاج"]
         await deals_search_command(update, context)
+        return
+    elif text in ["🔔 تنبيهات الأسعار الخاصة", "تنبيهاتي", "تنبيهات"]:
+        context.args = []
+        await watch_command(update, context)
         return
     elif text in ["سلام", "السلام عليكم", "مرحبا", "أهلا", "هلا", "مرحبا بك", "الو", "صباح الخير", "مساء الخير"]:
         await start_command(update, context)
@@ -1185,6 +1294,7 @@ def create_telegram_app() -> Application:
     application.add_handler(CommandHandler("latest", latest_command))
     application.add_handler(CommandHandler("deals", deals_search_command))
     application.add_handler(CommandHandler("search", deals_search_command))
+    application.add_handler(CommandHandler("watch", watch_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CallbackQueryHandler(category_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message_handler))

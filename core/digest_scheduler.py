@@ -25,8 +25,8 @@ MONTHS_AR = {
 
 THEMES = [
     {
-        "name": "زمردي ذهبي (صباحي)",
-        "headline": "نشرة أسعار الصباح في غزة",
+        "name": "زمردي ذهبي (صباحي - أساسيات وغذاء)",
+        "headline": "نشرة الصباح: أساسيات المطبخ والغذاء",
         "sub": "قبل ما تنزل السوق.. اعرف أرخص الأسعار الحية أولاً بأول",
         "bg_top": (4, 59, 47),
         "bg_mid": (7, 23, 40),
@@ -36,8 +36,8 @@ THEMES = [
         "gold": (251, 191, 36),
     },
     {
-        "name": "سماوي مشرق (عصري)",
-        "headline": "أقوى لقطات الأسواق الآن",
+        "name": "سماوي مشرق (عصري - بقالة ومنظفات)",
+        "headline": "نشرة العصر: البقالة والمنظفات والتوفير",
         "sub": "مقارنة حية لأسعار السلع اليوم في متاجر ومولات القطاع",
         "bg_top": (12, 54, 92),
         "bg_mid": (9, 24, 48),
@@ -47,8 +47,8 @@ THEMES = [
         "gold": (253, 224, 71),
     },
     {
-        "name": "ملكي ذهبي (مسائي)",
-        "headline": "ملخص التوفير المسائي في غزة",
+        "name": "ملكي ذهبي (مسائي - مقارنة المحافظات)",
+        "headline": "ملخص المساء: أرخص سعر في كل محافظة",
         "sub": "جهّز طلبات بكرة بأرخص سعر.. تغطية حية لجميع المحافظات",
         "bg_top": (55, 36, 14),
         "bg_mid": (19, 22, 42),
@@ -96,9 +96,31 @@ def get_gaza_now() -> datetime:
         from datetime import timedelta, timezone
         return datetime.now(timezone(timedelta(hours=2)))
 
-def get_digest_data(limit: int = 80) -> Dict[str, Any]:
-    """جلب مرشحي النشرة اليومية المتنوعين مع الصيغ المختلفة"""
+_MORNING_KWS = (
+    "دجاج", "لحم", "كبدة", "بانية", "سمك", "بطاطا", "بندورة", "طماطم", "خيار",
+    "بصل", "زيت", "سكر", "طحين", "جبنة", "لبن", "بيض", "فواكه", "رز", "أرز",
+)
+_AFTERNOON_KWS = (
+    "منظف", "صابون", "سائل", "كلور", "شامبو", "بامبرز", "حفاض", "نسكافيه",
+    "قهوة", "شاي", "شوكولاتة", "بسكويت", "تونة", "فول", "مكرونة", "عصير", "حليب",
+)
+
+
+def _slot_priority_score(row: Dict[str, Any], slot_hour: Optional[int]) -> int:
+    """ترتيب أولوية العروض حسب تخصص الفترة (10 صباحاً، 15 عصراً، 20 مساءً)"""
+    name = f"{row.get('product_name', '')} {row.get('store_category', '')}".lower()
+    score = 10 if row.get("is_partner") else 0
+    if slot_hour == 10 and any(k in name for k in _MORNING_KWS):
+        score += 20
+    elif slot_hour == 15 and any(k in name for k in _AFTERNOON_KWS):
+        score += 20
+    return score
+
+
+def get_digest_data(limit: int = 80, slot_hour: Optional[int] = None) -> Dict[str, Any]:
+    """جلب مرشحي النشرة اليومية المتنوعين مع حساب مؤشر التوفير وتخصص الفترات"""
     from core.ai_evaluator import is_invalid_product_name
+    from core.price_insights import compute_price_insight
 
     now_gaza = get_gaza_now()
     date_ar = f"{now_gaza.day} {MONTHS_AR.get(now_gaza.month, '')} {now_gaza.year}"
@@ -122,16 +144,20 @@ def get_digest_data(limit: int = 80) -> Dict[str, Any]:
             COALESCE(s.is_partner, 0) DESC,
             COALESCE(d.creation_time, 0) DESC,
             d.id DESC
-        LIMIT 200
+        LIMIT 250
         """)
         rows = [dict(r) for r in cursor.fetchall()]
+
+    if slot_hour in (10, 15):
+        rows = sorted(rows, key=lambda r: _slot_priority_score(r, slot_hour), reverse=True)
 
     candidates = []
     seen_prefixes = set()
     seen_stores = set()
+    seen_areas = set()
     used_ids = set()
 
-    # الجولة الأولى: اختيار صفقة واحدة مميزة من كل متجر ومن كل صنف لضمان تنوع رائع في النشرة
+    # الجولة الأولى: اختيار صفقة مميزة من كل متجر وصنف (ومحافظة مختلفة في نشرة المساء)
     for pass_num in (1, 2):
         for r in rows:
             if r["id"] in used_ids:
@@ -141,9 +167,12 @@ def get_digest_data(limit: int = 80) -> Dict[str, Any]:
                 continue
             sid = r.get("store_id")
             first_word = p_name.split()[0]
+            area_val = extract_general_area(r.get("location", ""), r.get("store_area", ""))
 
             if pass_num == 1:
                 if sid in seen_stores or first_word in seen_prefixes:
+                    continue
+                if slot_hour == 20 and len(seen_areas) < 5 and area_val in seen_areas:
                     continue
             else:
                 if first_word in seen_prefixes and len(candidates) < 12:
@@ -151,6 +180,7 @@ def get_digest_data(limit: int = 80) -> Dict[str, Any]:
 
             seen_stores.add(sid)
             seen_prefixes.add(first_word)
+            seen_areas.add(area_val)
             used_ids.add(r["id"])
 
             curr_raw = str(r.get("currency") or "ILS").upper()
@@ -161,14 +191,24 @@ def get_digest_data(limit: int = 80) -> Dict[str, Any]:
             except Exception:
                 p_str = str(r.get("price", ""))
 
+            insight = compute_price_insight(
+                product_name=p_name,
+                price=r.get("price"),
+                currency=curr_raw,
+                comparable_deals=rows,
+                deal_id=r["id"],
+            )
+
             candidates.append({
                 "id": r["id"],
                 "product_name": p_name[:34],
                 "price": p_str,
                 "currency": curr_label,
-                "area": extract_general_area(r.get("location", ""), r.get("store_area", "")),
+                "area": area_val,
                 "store_name": r.get("store_name") or "",
                 "is_partner": bool(r.get("is_partner", 0)),
+                "drop_pct": insight["drop_pct"] if insight else None,
+                "avg_price": insight["avg_price"] if insight else None,
             })
             if len(candidates) >= 18:
                 break
@@ -185,12 +225,13 @@ def build_varied_digest_caption(deals: List[Dict[str, Any]], stores_count: int, 
     """بناء 6 صيغ منشورات مختلفة وجذابة لمنع التكرار ورفع التفاعل على فيسبوك وواتساب"""
     deal_lines = "\n".join(
         f"🔹 {d['product_name']}: {d['price']} {d['currency']} ({d['area']})"
+        + (f" 🔥 أرخص بـ {d['drop_pct']}%" if d.get("drop_pct") else "")
         for d in deals
     )
     footer = (
         "\n🔍 لمعرفة أسماء المحلات والمواقع وأرقام التجار والبحث عن أي سلعة أخرى مجاناً 👇\n\n"
         "🌐 دليل الأسعار الحي (افتح مباشرة):\n"
-        "https://safaqat-pi7r.onrender.com/gaza\n\n"
+        "https://safaqat-pi7r.onrender.com/gaza?ref=tg\n\n"
         "📲 أو تابعنا على قناة تليجرام:\n"
         "@gaza_safaqat"
     )
@@ -365,6 +406,14 @@ def render_digest_image_bytes(deals: List[Dict[str, Any]], date_ar: str, stores_
         cb = draw.textbbox((0, 0), cu_txt, font=f_curr)
         draw.text((px + (pill_w - (cb[2] - cb[0])) // 2, py + 44), cu_txt, fill=(226, 232, 240), font=f_curr)
 
+        # شارة نسبة التوفير الحقيقية (لقطة اليوم) أسفل كبسولة السعر إن توفرت
+        drop_pct = deal.get("drop_pct")
+        if drop_pct:
+            sv_txt = _ar(f"أرخص {drop_pct}%")
+            svb = draw.textbbox((0, 0), sv_txt, font=f_curr)
+            draw.rounded_rectangle([(px + 12, py + pill_h + 6), (px + pill_w - 12, py + pill_h + 31)], radius=8, fill=(5, 150, 105, 220))
+            draw.text((px + (pill_w - (svb[2] - svb[0])) // 2, py + pill_h + 8), sv_txt, fill=(255, 255, 255), font=f_curr)
+
     # 6. الشريط السفلي (روابط الدخول)
     cta_y, cta_h = 880, 152
     draw.rounded_rectangle([(56, cta_y), (W - 56, cta_y + cta_h)], radius=26, fill=(6, 48, 42, 240), outline=theme["accent"], width=3)
@@ -414,7 +463,7 @@ class DailyDigestScheduler:
         if not token or not admin_id:
             return False
 
-        data = get_digest_data(limit=80)
+        data = get_digest_data(limit=80, slot_hour=slot_hour)
         candidates = data.get("candidates", [])
         if not candidates:
             return False

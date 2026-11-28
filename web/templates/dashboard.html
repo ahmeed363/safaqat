@@ -147,6 +147,11 @@
                 <i class="fa-solid fa-bullhorn"></i>
                 بث إشعار عام للمشتركين
             </button>
+            <button onclick="switchTab('analytics')" id="tab-btn-analytics" class="tab-btn pb-4 px-2 text-sm font-bold flex items-center gap-2 text-slate-300 hover:text-white transition">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>تحليلات وطلبات التجار</span>
+                <span id="tab-submissions-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-400/50 font-black">0</span>
+            </button>
         </div>
 
         <!-- TAB 1: DEALS MANAGEMENT -->
@@ -318,6 +323,61 @@
                         <i class="fa-solid fa-paper-plane"></i>
                         إرسال البث الآن
                     </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5: ANALYTICS & MERCHANT SUBMISSIONS -->
+        <section id="tab-analytics" class="space-y-6 hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-base font-black text-white flex items-center gap-2">
+                            <i class="fa-solid fa-magnifying-glass-chart text-emerald-400"></i>
+                            أكثر كلمات البحث طلباً (آخر 7 أيام)
+                        </h3>
+                        <span id="analytics-watches-pill" class="px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-xs font-bold">🔔 0 متابعة سعر</span>
+                    </div>
+                    <div id="analytics-top-searches" class="flex flex-wrap gap-2 text-xs text-slate-400">جاري التحميل...</div>
+                </div>
+
+                <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-base font-black text-white flex items-center gap-2">
+                            <i class="fa-solid fa-share-nodes text-sky-400"></i>
+                            زيارات صفحة العروض حسب المصدر (7 أيام)
+                        </h3>
+                        <button onclick="loadAnalyticsAndSubmissions()" class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-bold text-slate-200 transition">
+                            <i class="fa-solid fa-rotate-right"></i> تحديث
+                        </button>
+                    </div>
+                    <div id="analytics-visits-list" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">جاري التحميل...</div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl overflow-hidden shadow-sm">
+                <div class="p-4 border-b border-slate-700/80 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-base font-black text-white flex items-center gap-2">
+                            <i class="fa-solid fa-store text-amber-400"></i>
+                            عروض التجار المرسلة مباشرة (قيد المراجعة)
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">رابط إرسال التجار: <a href="/submit" target="_blank" class="text-emerald-400 underline font-bold">/submit</a></p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-slate-900/60 text-slate-400 text-xs font-bold border-b border-slate-700">
+                            <tr>
+                                <th class="p-4">المتجر</th>
+                                <th class="p-4">المنطقة والجوال</th>
+                                <th class="p-4">السلعة</th>
+                                <th class="p-4">السعر</th>
+                                <th class="p-4 text-center">إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="submissions-table-body" class="divide-y divide-slate-700/50"></tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -659,13 +719,14 @@
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('tab-btn-' + tab).classList.add('active');
 
-            ['deals', 'stores', 'subscribers', 'broadcast'].forEach(t => {
+            ['deals', 'stores', 'subscribers', 'broadcast', 'analytics'].forEach(t => {
                 document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
             });
 
             if (tab === 'deals') loadDeals();
             if (tab === 'stores') loadStores();
             if (tab === 'subscribers') loadSubscribers();
+            if (tab === 'analytics') loadAnalyticsAndSubmissions();
         }
 
         // Load Stats
@@ -1616,10 +1677,72 @@ https://safaqat-pi7r.onrender.com/gaza
             }
         }
 
+        async function loadAnalyticsAndSubmissions() {
+            try {
+                const [aRes, sRes] = await Promise.all([fetch('/api/analytics'), fetch('/api/submissions')]);
+                const analytics = await aRes.json();
+                const subs = await sRes.json();
+
+                document.getElementById('analytics-watches-pill').textContent = `🔔 ${analytics.total_watches || 0} متابعة سعر`;
+                const pendingCount = analytics.pending_submissions || subs.length || 0;
+                const badge = document.getElementById('tab-submissions-badge');
+                if (badge) {
+                    badge.textContent = pendingCount;
+                    badge.classList.toggle('hidden', pendingCount <= 0);
+                }
+
+                const searchBox = document.getElementById('analytics-top-searches');
+                const topSearches = analytics.top_searches || [];
+                searchBox.innerHTML = topSearches.length
+                    ? topSearches.map(item => `<span class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 font-bold">${item.keyword} <span class="text-emerald-400">(${item.cnt})</span></span>`).join('')
+                    : '<span class="text-slate-500">لا توجد عمليات بحث مسجلة بعد — ستظهر تلقائياً مع استخدام البوت والموقع.</span>';
+
+                const visitsBox = document.getElementById('analytics-visits-list');
+                const visits = analytics.visits_by_source || [];
+                const srcNames = { facebook: '📘 فيسبوك', telegram: '✈️ تليجرام', whatsapp: '💬 واتساب', direct: '🌐 مباشر' };
+                visitsBox.innerHTML = visits.length
+                    ? visits.map(v => `<div class="p-3 rounded-xl bg-slate-900 border border-slate-700"><div class="text-slate-400 font-bold mb-1">${srcNames[v.source] || v.source}</div><div class="text-lg font-black text-white">${v.cnt}</div></div>`).join('')
+                    : '<div class="col-span-full text-slate-500 py-2">لا توجد زيارات مسجلة بعد.</div>';
+
+                const tbody = document.getElementById('submissions-table-body');
+                tbody.innerHTML = subs.length ? subs.map(m => `
+                    <tr class="hover:bg-slate-800/40">
+                        <td class="p-4 font-bold text-white">${m.store_name}</td>
+                        <td class="p-4 text-xs text-slate-300">${m.city_area}<br><span class="text-sky-400">${m.phone || 'بدون رقم'}</span></td>
+                        <td class="p-4 font-bold text-slate-200">${m.product_name}<div class="text-[11px] text-slate-400">${m.notes || ''}</div></td>
+                        <td class="p-4 font-black text-emerald-400">${m.price} ${m.currency || 'ILS'}</td>
+                        <td class="p-4 text-center space-x-2 space-x-reverse">
+                            <button onclick="approveSubmission(${m.id})" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">اعتماد ونشر</button>
+                            <button onclick="rejectSubmission(${m.id})" class="px-3 py-1.5 rounded-lg bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-bold">رفض</button>
+                        </td>
+                    </tr>`).join('') : '<tr><td colspan="5" class="p-8 text-center text-slate-500">لا توجد عروض تجار بانتظار المراجعة حالياً.</td></tr>';
+            } catch (e) {
+                console.error('Analytics load error:', e);
+            }
+        }
+
+        async function approveSubmission(id) {
+            const res = await fetch(`/api/submissions/${id}/approve`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                alert('✅ ' + data.message);
+                loadAnalyticsAndSubmissions();
+                loadStats();
+            } else {
+                alert('خطأ: ' + (data.detail || 'تعذر الاعتماد'));
+            }
+        }
+
+        async function rejectSubmission(id) {
+            const res = await fetch(`/api/submissions/${id}/reject`, { method: 'POST' });
+            if (res.ok) loadAnalyticsAndSubmissions();
+        }
+
         // Init on load
         window.addEventListener('DOMContentLoaded', () => {
             loadStats();
             loadDeals();
+            loadAnalyticsAndSubmissions();
             // Pre-fetch subscribers to update tab counts and new badge immediately
             fetch('/api/subscribers').then(r => r.json()).then(data => {
                 allSubs = data || [];

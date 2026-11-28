@@ -64,6 +64,7 @@ app = FastAPI(title="رادار صفقات غزة - لوحة تحكم الإدا
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "dashboard.html")
 LOGIN_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "login.html")
 OFFERS_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "offers.html")
+SUBMIT_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "templates", "submit.html")
 SESSION_COOKIE_NAME = "safaqat_admin_session"
 
 # --- Authentication Helpers ---
@@ -158,6 +159,18 @@ class DigestSendPayload(BaseModel):
     image_base64: str
     caption: Optional[str] = ""
 
+class MerchantSubmitPayload(BaseModel):
+    store_name: str
+    city_area: str
+    phone: Optional[str] = ""
+    product_name: str
+    price: float
+    currency: Optional[str] = "ILS"
+    notes: Optional[str] = ""
+
+class PublicTrackSearchPayload(BaseModel):
+    query: str
+
 # --- Web Endpoints ---
 
 @app.api_route("/login", methods=["GET", "HEAD"], response_class=HTMLResponse)
@@ -234,13 +247,70 @@ async def serve_dashboard(request: Request):
 
 @app.api_route("/gaza", methods=["GET", "HEAD"], response_class=HTMLResponse)
 @app.api_route("/offers", methods=["GET", "HEAD"], response_class=HTMLResponse)
-async def serve_public_offers():
-    """عرض الواجهة العامة المجانية لعروض اليوم في غزة (بوابة جذب المشتركين)"""
+async def serve_public_offers(request: Request):
+    """عرض الواجهة العامة المجانية لعروض اليوم في غزة مع تتبع مصدر الزيارة"""
+    if request.method == "GET":
+        ref = str(request.query_params.get("ref") or "").strip().lower()
+        src_map = {"fb": "facebook", "facebook": "facebook", "tg": "telegram", "telegram": "telegram", "wa": "whatsapp", "whatsapp": "whatsapp"}
+        src = src_map.get(ref, ref or "direct")
+        db.log_analytics_event("visit", "gaza", source=src)
     if not os.path.exists(OFFERS_TEMPLATE_PATH):
         raise HTTPException(status_code=404, detail="Offers page not found")
     with open(OFFERS_TEMPLATE_PATH, "r", encoding="utf-8") as f:
         html_content = f.read()
     return HTMLResponse(content=html_content)
+
+@app.api_route("/submit", methods=["GET", "HEAD"], response_class=HTMLResponse)
+async def serve_merchant_submit():
+    """بوابة التجار المجانية لإضافة عرض جديد"""
+    if not os.path.exists(SUBMIT_TEMPLATE_PATH):
+        raise HTTPException(status_code=404, detail="Submit page not found")
+    with open(SUBMIT_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content)
+
+@app.post("/api/public/track_search")
+async def track_public_search(payload: PublicTrackSearchPayload):
+    """تسجيل كلمات البحث العامة من الزوار لمعرفة السلع الأكثر طلباً"""
+    q = str(payload.query or "").strip()
+    if len(q) >= 2:
+        db.log_analytics_event("search", q, source="web")
+    return {"status": "ok"}
+
+@app.post("/api/public/submit_deal")
+async def submit_merchant_deal(payload: MerchantSubmitPayload):
+    """استلام عرض تاجر جديد وحفظه للمراجعة مع تنبيه الإدارة على تليجرام"""
+    if len(payload.store_name.strip()) < 2 or len(payload.product_name.strip()) < 2 or payload.price <= 0:
+        raise HTTPException(status_code=400, detail="يرجى إدخال اسم المتجر واسم السلعة وسعر صالح")
+
+    sub_id = db.create_merchant_submission(
+        store_name=payload.store_name,
+        city_area=payload.city_area,
+        phone=payload.phone or "",
+        product_name=payload.product_name,
+        price=payload.price,
+        currency=payload.currency or "ILS",
+        notes=payload.notes or "",
+    )
+
+    if settings.TELEGRAM_BOT_TOKEN and settings.ADMIN_TELEGRAM_ID:
+        try:
+            async with Bot(token=settings.TELEGRAM_BOT_TOKEN) as bot:
+                msg = (
+                    f"🏪 **طلب عرض جديد من تاجر (#{sub_id})**\n\n"
+                    f"• **المتجر:** {payload.store_name}\n"
+                    f"• **المنطقة:** {payload.city_area}\n"
+                    f"• **الهاتف:** `{payload.phone or 'غير مرفق'}`\n"
+                    f"• **السلعة:** {payload.product_name}\n"
+                    f"• **السعر:** {payload.price} {payload.currency or 'ILS'}\n"
+                    f"• **ملاحظات:** {payload.notes or '-'}\n\n"
+                    f"👇 راجعه واعتمد نشره من لوحة التحكم ← تبويب *تحليلات وطلبات التجار*."
+                )
+                await bot.send_message(chat_id=str(settings.ADMIN_TELEGRAM_ID), text=msg, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    return {"status": "ok", "submission_id": sub_id, "message": "تم استلام عرضك بنجاح! ستتم مراجعته ونشره في دليل الأسعار وتليجرام وفيسبوك قريباً."}
 
 def _extract_general_area(raw_loc: str, store_area: str = "") -> str:
     """استدعاء الدالة المشتركة لتحديد المحافظة العامة"""
@@ -249,8 +319,9 @@ def _extract_general_area(raw_loc: str, store_area: str = "") -> str:
 
 @app.get("/api/public/deals")
 async def get_public_deals(limit: int = Query(120, ge=10, le=200)):
-    """جلب أحدث الصفقات للعرض العام مع إخفاء اسم المتجر والهاتف والعنوان التفصيلي"""
+    """جلب أحدث الصفقات للعرض العام مع إخفاء اسم المتجر وحساب مؤشر التوفير الحقيقي"""
     from core.ai_evaluator import is_invalid_product_name
+    from core.price_insights import compute_price_insight
     with db.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM stores WHERE is_verified = 1")
@@ -290,6 +361,8 @@ async def get_public_deals(limit: int = Query(120, ge=10, le=200)):
         except Exception:
             p_str = str(r.get("price", ""))
 
+        insight = compute_price_insight(p_name, r.get("price"), curr_raw, rows, deal_id=r["id"])
+
         public_deals.append({
             "id": r["id"],
             "product_name": p_name,
@@ -299,6 +372,8 @@ async def get_public_deals(limit: int = Query(120, ge=10, le=200)):
             "post_time_text": r.get("post_time_text") or "اليوم",
             "category": r.get("store_category") or "عام",
             "is_partner": bool(r.get("is_partner", 0)),
+            "drop_pct": insight["drop_pct"] if insight else None,
+            "avg_price": insight["avg_price"] if insight else None,
         })
 
     return {
@@ -461,10 +536,35 @@ async def test_custom_deal_endpoint(payload: CustomTestDealPayload, _: bool = De
     return {"status": "ok", "message": f"تم إرسال التجربة لـ ({payload.product_name}) بنجاح إلى تليجرام الإدارة! 🚀"}
 
 @app.get("/api/digest")
-async def get_daily_digest(_: bool = Depends(require_admin)):
+async def get_daily_digest(slot_hour: Optional[int] = None, _: bool = Depends(require_admin)):
     """توليد قائمة متنوعة من أقوى وأرخص عروض اليوم مع 6 صيغ منشورات مختلفة"""
     from core.digest_scheduler import get_digest_data
-    return get_digest_data(limit=80)
+    return get_digest_data(limit=80, slot_hour=slot_hour)
+
+@app.get("/api/analytics")
+async def get_analytics_endpoint(days: int = Query(7, ge=1, le=90), _: bool = Depends(require_admin)):
+    """تحليلات البحث والزيارات وطلبات التجار"""
+    return db.get_analytics_summary(days=days)
+
+@app.get("/api/submissions")
+async def get_submissions_endpoint(status: str = Query("pending"), _: bool = Depends(require_admin)):
+    """جلب طلبات العروض المقدمة من التجار"""
+    return db.get_merchant_submissions(status=status)
+
+@app.post("/api/submissions/{submission_id}/approve")
+async def approve_submission_endpoint(submission_id: int, _: bool = Depends(require_admin)):
+    """اعتماد عرض تاجر ونشره كصفقة حية"""
+    deal_id = db.approve_merchant_submission(submission_id)
+    if deal_id is None:
+        raise HTTPException(status_code=404, detail="الطلب غير موجود أو تمت معالجته مسبقاً")
+    return {"status": "ok", "deal_id": deal_id, "message": "تم اعتماد العرض ونشره في دليل الأسعار والرادار بنجاح! ✅"}
+
+@app.post("/api/submissions/{submission_id}/reject")
+async def reject_submission_endpoint(submission_id: int, _: bool = Depends(require_admin)):
+    """رفض طلب عرض تاجر"""
+    if not db.reject_merchant_submission(submission_id):
+        raise HTTPException(status_code=404, detail="الطلب غير موجود")
+    return {"status": "ok", "message": "تم رفض الطلب."}
 
 @app.post("/api/digest/trigger_auto")
 async def trigger_auto_digest_now(slot_hour: int = Query(10), _: bool = Depends(require_admin)):

@@ -28,9 +28,26 @@ class AlertDispatcher:
             return 0
 
         async def _send_with_bot(active_bot: Bot) -> int:
+            from core.price_insights import compute_price_insight
             subscribers = db.get_active_subscribers()
             sent_count = 0
             deal_id = deal.get("id")
+
+            watch_matches = db.find_matching_watch_chat_ids(
+                product_name=prod_name,
+                area_text=str(deal.get("location") or ""),
+                price=deal.get("price") or 0,
+            )
+
+            insight = None
+            try:
+                with db.get_connection() as conn:
+                    c = conn.cursor()
+                    c.execute("SELECT id, product_name, price, currency FROM deals WHERE is_bargain = 1 AND price > 0 ORDER BY id DESC LIMIT 250")
+                    peers = [dict(r) for r in c.fetchall()]
+                insight = compute_price_insight(prod_name, deal.get("price"), deal.get("currency", "ILS"), peers, deal_id=deal_id)
+            except Exception:
+                pass
 
             reply_markup = None
             if deal_id:
@@ -42,6 +59,11 @@ class AlertDispatcher:
                 chat_id = str(sub["telegram_chat_id"])
                 is_admin = (chat_id == str(settings.ADMIN_TELEGRAM_ID))
                 subscriber_text = render_deal_card(deal, is_admin=is_admin, is_broadcast=True, compact=True)
+                if insight:
+                    subscriber_text += f"\n📉 *مؤشر التوفير:* أرخص بـ {insight['drop_pct']}% من متوسط السوق ({insight['avg_price']})"
+                if chat_id in watch_matches:
+                    kws = "، ".join(watch_matches[chat_id])
+                    subscriber_text = f"🔔 **تنبيه سعر خاص — يطابق متابعتك لـ ({kws})!**\n\n" + subscriber_text
 
                 try:
                     await active_bot.send_message(
@@ -68,15 +90,16 @@ class AlertDispatcher:
 
             # إذا كانت هناك قناة عامة للتسويق (نرسل نسخة طعم تسويقية بدون اسم المتجر ورقم الهاتف)
             if settings.TELEGRAM_BROADCAST_CHAT_ID:
-                prod_name = deal.get("product_name", "سلعة جديدة")
+                prod_name_t = deal.get("product_name", "سلعة جديدة")
                 prod_price = deal.get("price", "")
                 prod_curr = deal.get("currency", "ILS")
                 prod_loc = deal.get("location", "قطاع غزة")
                 post_time = deal.get("post_time_text", "اليوم")
+                drop_line = f"\n📉 **التوفير:** أرخص بـ {insight['drop_pct']}% من متوسط السوق 🔥" if insight else ""
                 teaser_text = (
                     f"⚡ **صيد جديد رصده الرادار في أسواق غزة** ⚡\n\n"
-                    f"🛍️ **السلعة:** {prod_name}\n"
-                    f"🔥 **السعر:** {prod_price} {prod_curr} *(سعر حرق)*\n"
+                    f"🛍️ **السلعة:** {prod_name_t}\n"
+                    f"🔥 **السعر:** {prod_price} {prod_curr} *(سعر حرق)*{drop_line}\n"
                     f"📍 **المنطقة:** {prod_loc}\n"
                     f"⏰ **التوقيت:** {post_time}\n\n"
                     f"🔒 **تنبيه:** اسم المتجر ورقم هاتف التاجر ورابط العرض الأصلي محجوبة ومخصصة للمشتركين في البوت الخاص.\n\n"

@@ -63,6 +63,58 @@ def sync_from_turso_on_boot(local_db_path: str = "safaqat.db"):
         except Exception as e:
             print(f"[TursoSync] subscribers sync note: {e}")
 
+        # التأكد من وجود الجداول الإضافية على سحابة Turso قبل الاستعلام
+        for ddl in (
+            """CREATE TABLE IF NOT EXISTS price_watches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id TEXT NOT NULL, keyword TEXT NOT NULL,
+                area_filter TEXT DEFAULT 'الكل', max_price REAL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(chat_id, keyword))""",
+            """CREATE TABLE IF NOT EXISTS analytics_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL, value TEXT NOT NULL,
+                source TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""",
+            """CREATE TABLE IF NOT EXISTS merchant_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, store_name TEXT NOT NULL, city_area TEXT NOT NULL,
+                phone TEXT DEFAULT '', product_name TEXT NOT NULL, price REAL NOT NULL, currency TEXT DEFAULT 'ILS',
+                notes TEXT DEFAULT '', status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""",
+        ):
+            try:
+                turso.execute(ddl)
+            except Exception:
+                pass
+
+        # مزامنة تنبيهات الأسعار
+        try:
+            watches = turso.query("SELECT * FROM price_watches;")
+            for w in watches:
+                c.execute("""
+                INSERT INTO price_watches (chat_id, keyword, area_filter, max_price, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(chat_id, keyword) DO UPDATE SET area_filter=excluded.area_filter, max_price=excluded.max_price;
+                """, [w.get("chat_id"), w.get("keyword"), w.get("area_filter", "الكل"), w.get("max_price"), w.get("created_at")])
+        except Exception as e:
+            print(f"[TursoSync] watches sync note: {e}")
+
+        # مزامنة طلبات التجار
+        try:
+            subs_m = turso.query("SELECT * FROM merchant_submissions;")
+            for m in subs_m:
+                c.execute("""
+                INSERT OR IGNORE INTO merchant_submissions (id, store_name, city_area, phone, product_name, price, currency, notes, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """, [m.get("id"), m.get("store_name"), m.get("city_area"), m.get("phone"), m.get("product_name"), m.get("price"), m.get("currency", "ILS"), m.get("notes"), m.get("status", "pending"), m.get("created_at")])
+        except Exception as e:
+            print(f"[TursoSync] submissions sync note: {e}")
+
+        # مزامنة أحداث التحليلات (آخر 7 أيام فقط)
+        try:
+            evs = turso.query("SELECT * FROM analytics_events WHERE created_at >= datetime('now', '-7 days') ORDER BY id DESC LIMIT 1000;")
+            for ev in evs:
+                c.execute("""
+                INSERT OR IGNORE INTO analytics_events (id, event_type, value, source, created_at)
+                VALUES (?, ?, ?, ?, ?);
+                """, [ev.get("id"), ev.get("event_type"), ev.get("value"), ev.get("source", ""), ev.get("created_at")])
+        except Exception as e:
+            print(f"[TursoSync] analytics sync note: {e}")
+
         local_conn.commit()
         local_conn.close()
         print("[TursoSync] ✅ تم مزامنة البيانات السحابية بنجاح. أحدث البيانات متاحة ومحفوظة!")

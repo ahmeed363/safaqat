@@ -78,11 +78,20 @@ class DatabaseManager:
                 location TEXT,
                 phone_contact TEXT,
                 image_url TEXT,
+                post_time_text TEXT DEFAULT '',
+                creation_time INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 broadcasted_at TIMESTAMP,
                 FOREIGN KEY (store_id) REFERENCES stores (id)
             );
             """)
+
+            cursor.execute("PRAGMA table_info(deals)")
+            deal_cols = {row[1] for row in cursor.fetchall()}
+            if "post_time_text" not in deal_cols:
+                cursor.execute("ALTER TABLE deals ADD COLUMN post_time_text TEXT DEFAULT ''")
+            if "creation_time" not in deal_cols:
+                cursor.execute("ALTER TABLE deals ADD COLUMN creation_time INTEGER DEFAULT 0")
 
             # 4. جدول المشتركين في بوت التليجرام (Subscribers)
             cursor.execute("""
@@ -108,6 +117,46 @@ class DatabaseManager:
                 cursor.execute("ALTER TABLE subscribers ADD COLUMN referred_by TEXT")
             if "referral_count" not in sub_cols:
                 cursor.execute("ALTER TABLE subscribers ADD COLUMN referral_count INTEGER DEFAULT 0")
+
+            # 5. جدول تنبيهات الأسعار المخصصة للمشتركين (Price Watches)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS price_watches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id TEXT NOT NULL,
+                keyword TEXT NOT NULL,
+                area_filter TEXT DEFAULT 'الكل',
+                max_price REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(chat_id, keyword)
+            );
+            """)
+
+            # 6. جدول تحليلات البحث والزيارات (Analytics Events)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS analytics_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                value TEXT NOT NULL,
+                source TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # 7. جدول عروض التجار المرسلة مباشرة للمراجعة (Merchant Submissions)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS merchant_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                store_name TEXT NOT NULL,
+                city_area TEXT NOT NULL,
+                phone TEXT DEFAULT '',
+                product_name TEXT NOT NULL,
+                price REAL NOT NULL,
+                currency TEXT DEFAULT 'ILS',
+                notes TEXT DEFAULT '',
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
 
             conn.commit()
 
@@ -501,6 +550,237 @@ class DatabaseManager:
             cursor.execute("SELECT * FROM subscribers WHERE telegram_chat_id = ?", (str(chat_id),))
             row = cursor.fetchone()
             return dict(row) if row else None
+
+    # --- تنبيهات الأسعار المخصصة (Price Watches) ---
+
+    def add_price_watch(self, chat_id: str, keyword: str, area_filter: str = "الكل", max_price: Optional[float] = None) -> bool:
+        """إضافة أو تحديث تنبيه سعر لمشترك"""
+        kw = str(keyword or "").strip()[:60]
+        if len(kw) < 2:
+            return False
+        area = str(area_filter or "الكل").strip()[:40]
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO price_watches (chat_id, keyword, area_filter, max_price)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(chat_id, keyword) DO UPDATE SET
+                area_filter = excluded.area_filter,
+                max_price = excluded.max_price
+            """, (str(chat_id), kw, area, max_price))
+            conn.commit()
+        _turso_sync("""
+        INSERT INTO price_watches (chat_id, keyword, area_filter, max_price)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(chat_id, keyword) DO UPDATE SET
+            area_filter = excluded.area_filter,
+            max_price = excluded.max_price
+        """, (str(chat_id), kw, area, max_price))
+        return True
+
+    def get_user_watches(self, chat_id: str) -> List[Dict[str, Any]]:
+        """جلب قائمة السلع التي يتابعها المشترك"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM price_watches WHERE chat_id = ? ORDER BY id DESC", (str(chat_id),))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def remove_price_watch(self, chat_id: str, watch_id: int) -> bool:
+        """إلغاء تنبيه سعر محدد للمشترك"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM price_watches WHERE id = ? AND chat_id = ?", (watch_id, str(chat_id)))
+            conn.commit()
+            removed = cursor.rowcount > 0
+        if removed:
+            _turso_sync("DELETE FROM price_watches WHERE id = ? AND chat_id = ?", (watch_id, str(chat_id)))
+        return removed
+
+    def find_matching_watch_chat_ids(self, product_name: str, area_text: str = "", price: float = 0) -> Dict[str, List[str]]:
+        """إرجاع خريطة {chat_id: [matched_keywords]} للمشتركين المهتمين بهذه السلعة"""
+        p_low = str(product_name or "").lower()
+        a_low = str(area_text or "").lower()
+        if not p_low:
+            return {}
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT chat_id, keyword, area_filter, max_price FROM price_watches")
+            watches = [dict(r) for r in cursor.fetchall()]
+
+        matches: Dict[str, List[str]] = {}
+        for w in watches:
+            kw = str(w.get("keyword") or "").strip().lower()
+            if not kw or kw not in p_low:
+                continue
+            af = str(w.get("area_filter") or "الكل").strip()
+            if af and af != "الكل" and af.lower() not in a_low:
+                continue
+            mp = w.get("max_price")
+            try:
+                if mp is not None and float(price or 0) > float(mp):
+                    continue
+            except Exception:
+                pass
+            cid = str(w["chat_id"])
+            matches.setdefault(cid, []).append(w["keyword"])
+        return matches
+
+    # --- التحليلات (Analytics) ---
+
+    def log_analytics_event(self, event_type: str, value: str, source: str = ""):
+        """تسجيل عملية بحث أو زيارة صفحة لقياس اهتمام المستخدمين"""
+        ev = str(event_type or "").strip()[:30]
+        val = str(value or "").strip()[:80]
+        src = str(source or "").strip()[:30]
+        if not ev or not val:
+            return
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO analytics_events (event_type, value, source) VALUES (?, ?, ?)",
+                    (ev, val, src)
+                )
+                conn.commit()
+            _turso_sync(
+                "INSERT INTO analytics_events (event_type, value, source) VALUES (?, ?, ?)",
+                (ev, val, src)
+            )
+        except Exception:
+            pass
+
+    def get_analytics_summary(self, days: int = 7) -> Dict[str, Any]:
+        """ملخص أكثر كلمات البحث ومصادر الزيارات خلال آخر N أيام"""
+        since = f"-{int(days)} days"
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT value AS keyword, COUNT(*) AS cnt
+                FROM analytics_events
+                WHERE event_type = 'search' AND created_at >= datetime('now', ?)
+                GROUP BY LOWER(value)
+                ORDER BY cnt DESC
+                LIMIT 10
+            """, (since,))
+            top_searches = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("""
+                SELECT COALESCE(NULLIF(source, ''), 'direct') AS source, COUNT(*) AS cnt
+                FROM analytics_events
+                WHERE event_type = 'visit' AND created_at >= datetime('now', ?)
+                GROUP BY COALESCE(NULLIF(source, ''), 'direct')
+                ORDER BY cnt DESC
+            """, (since,))
+            visits_by_source = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("SELECT COUNT(*) FROM price_watches")
+            total_watches = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM merchant_submissions WHERE status = 'pending'")
+            pending_submissions = cursor.fetchone()[0]
+
+        return {
+            "days": days,
+            "top_searches": top_searches,
+            "visits_by_source": visits_by_source,
+            "total_visits": sum(v["cnt"] for v in visits_by_source),
+            "total_searches": sum(s["cnt"] for s in top_searches),
+            "total_watches": total_watches,
+            "pending_submissions": pending_submissions,
+        }
+
+    # --- عروض التجار المباشرة (Merchant Submissions) ---
+
+    def create_merchant_submission(
+        self, store_name: str, city_area: str, phone: str,
+        product_name: str, price: float, currency: str = "ILS", notes: str = ""
+    ) -> int:
+        """حفظ عرض مقدم مباشرة من تاجر بانتظار موافقة الإدارة"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO merchant_submissions (store_name, city_area, phone, product_name, price, currency, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (store_name.strip(), city_area.strip(), phone.strip(), product_name.strip(), float(price), currency.strip(), notes.strip()))
+            conn.commit()
+            sid = cursor.lastrowid
+        _turso_sync("""
+        INSERT INTO merchant_submissions (store_name, city_area, phone, product_name, price, currency, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (store_name.strip(), city_area.strip(), phone.strip(), product_name.strip(), float(price), currency.strip(), notes.strip()))
+        return sid
+
+    def get_merchant_submissions(self, status: str = "pending") -> List[Dict[str, Any]]:
+        """جلب عروض التجار المرسلة"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if status == "all":
+                cursor.execute("SELECT * FROM merchant_submissions ORDER BY id DESC LIMIT 50")
+            else:
+                cursor.execute("SELECT * FROM merchant_submissions WHERE status = ? ORDER BY id DESC LIMIT 50", (status,))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def approve_merchant_submission(self, submission_id: int) -> Optional[int]:
+        """اعتماد عرض تاجر وتحويله مباشرة إلى صفقة حية في الرادار"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM merchant_submissions WHERE id = ? AND status = 'pending'", (submission_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            sub = dict(row)
+
+            # البحث عن متجر مطابق أو إنشاؤه وإغلاق المعاملة قبل add_deal
+            cursor.execute("SELECT id FROM stores WHERE name = ? LIMIT 1", (sub["store_name"],))
+            st = cursor.fetchone()
+            if st:
+                store_id = st[0]
+            else:
+                pseudo_url = f"https://safaqat-pi7r.onrender.com/merchant/{submission_id}"
+                cursor.execute("""
+                INSERT INTO stores (name, url, platform, city_area, category, phone, is_verified, discovery_source)
+                VALUES (?, ?, 'merchant_direct', ?, 'عروض التجار', ?, 1, 'merchant_portal')
+                """, (sub["store_name"], pseudo_url, sub["city_area"], sub["phone"]))
+                store_id = cursor.lastrowid
+                conn.commit()
+                _turso_sync("""
+                INSERT INTO stores (name, url, platform, city_area, category, phone, is_verified, discovery_source)
+                VALUES (?, ?, 'merchant_direct', ?, 'عروض التجار', ?, 1, 'merchant_portal')
+                """, (sub["store_name"], pseudo_url, sub["city_area"], sub["phone"]))
+
+        raw_url = f"https://safaqat-pi7r.onrender.com/gaza?sub={submission_id}"
+        summary = sub.get("notes") or f"عرض مباشر من {sub['store_name']} في {sub['city_area']}"
+        deal_id = self.add_deal(
+            store_id=store_id,
+            product_name=sub["product_name"],
+            price=sub["price"],
+            raw_post_url=raw_url,
+            summary_ar=summary,
+            location=sub["city_area"],
+            phone_contact=sub["phone"],
+            currency=sub.get("currency") or "ILS",
+            is_bargain=True,
+            media_type="direct",
+            post_time_text="اليوم مباشر ⚡",
+            creation_time=int(datetime.now().timestamp()),
+        )
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE merchant_submissions SET status = 'approved' WHERE id = ?", (submission_id,))
+            conn.commit()
+        _turso_sync("UPDATE merchant_submissions SET status = 'approved' WHERE id = ?", (submission_id,))
+        return deal_id
+
+    def reject_merchant_submission(self, submission_id: int) -> bool:
+        """رفض عرض تاجر مرسل"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE merchant_submissions SET status = 'rejected' WHERE id = ?", (submission_id,))
+            conn.commit()
+            ok = cursor.rowcount > 0
+        if ok:
+            _turso_sync("UPDATE merchant_submissions SET status = 'rejected' WHERE id = ?", (submission_id,))
+        return ok
 
 db = DatabaseManager()
 

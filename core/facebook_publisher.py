@@ -33,7 +33,7 @@ class FacebookPublisher:
 
         comment_text = (
             "🌐 دليل الأسعار الحي (ابحث واعرف أسماء المحلات مجاناً):\n"
-            "https://safaqat-pi7r.onrender.com/gaza\n\n"
+            "https://safaqat-pi7r.onrender.com/gaza?ref=fb\n\n"
             "📲 قناة العروض اليومية على تليجرام:\n"
             "https://t.me/gaza_safaqat"
         )

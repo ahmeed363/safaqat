@@ -53,10 +53,17 @@
                 </div>
             </div>
 
-            <a href="https://t.me/gaza_safaqat" target="_blank" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-extrabold shadow-lg shadow-sky-600/25 transition">
-                <i class="fa-brands fa-telegram text-base"></i>
-                <span>قناة تليجرام</span>
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="/submit" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-300 text-xs font-extrabold transition">
+                    <i class="fa-solid fa-store"></i>
+                    <span class="hidden sm:inline">أضف عرض متجرك</span>
+                    <span class="sm:hidden">للتجار</span>
+                </a>
+                <a href="https://t.me/gaza_safaqat" target="_blank" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-extrabold shadow-lg shadow-sky-600/25 transition">
+                    <i class="fa-brands fa-telegram text-base"></i>
+                    <span>قناة تليجرام</span>
+                </a>
+            </div>
         </div>
     </header>
 
@@ -165,6 +172,22 @@
     <script>
         let allDeals = [];
         let selectedArea = 'الكل';
+        let _searchLogTimer = null;
+        let _lastLoggedQuery = '';
+
+        function scheduleSearchTrack(q) {
+            clearTimeout(_searchLogTimer);
+            const clean = (q || '').trim();
+            if (clean.length < 2 || clean === _lastLoggedQuery) return;
+            _searchLogTimer = setTimeout(() => {
+                _lastLoggedQuery = clean;
+                fetch('/api/public/track_search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: clean })
+                }).catch(() => {});
+            }, 900);
+        }
 
         function setArea(area, btn) {
             selectedArea = area;
@@ -202,6 +225,7 @@
         function renderDeals() {
             const grid = document.getElementById('deals-grid');
             const q = (document.getElementById('search-input').value || '').trim().toLowerCase();
+            scheduleSearchTrack(q);
 
             const filtered = allDeals.filter(d => {
                 const matchSearch = !q ||
@@ -237,6 +261,9 @@
                 const partnerBadge = d.is_partner
                     ? `<span class="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black">⭐ شريك معتمد</span>`
                     : '';
+                const savingsBadge = d.drop_pct
+                    ? `<span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-black">📉 أرخص بـ ${d.drop_pct}%</span>`
+                    : '';
 
                 return `
                 <article class="${partnerCardCls} border rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-lg transition">
@@ -248,6 +275,7 @@
                                     ${area}
                                 </span>
                                 ${partnerBadge}
+                                ${savingsBadge}
                             </div>
                             <span class="text-slate-400 font-semibold">${timeTxt}</span>
                         </div>
