@@ -59,6 +59,13 @@ THEMES = [
     },
 ]
 
+def _load_font(path: str, size: int) -> ImageFont.FreeTypeFont:
+    """إجبار محرك BASIC في Pillow لمنع عكس النص مرتين على لينكس عند توفر libraqm"""
+    layout_basic = getattr(getattr(ImageFont, "Layout", None), "BASIC", None)
+    kwargs = {"layout_engine": layout_basic} if layout_basic is not None else {}
+    return ImageFont.truetype(path, size, **kwargs)
+
+
 def _ar(text: str) -> str:
     """تشكيل وترتيب النص العربي للعرض السليم من اليمين لليسار بدون إيموجي"""
     clean = re.sub(r'[\U00010000-\U0010ffff]|[\u2600-\u27bf]', '', str(text or '')).strip()
@@ -278,21 +285,21 @@ def render_digest_image_bytes(deals: List[Dict[str, Any]], date_ar: str, stores_
     img = Image.alpha_composite(img, overlay)
     draw = ImageDraw.Draw(img)
 
-    # تحميل الخطوط المدمجة
+    # تحميل الخطوط المدمجة بمحرك BASIC موحد بين ويندوز ولينكس
     if os.path.exists(FONT_BLACK_PATH):
-        f_headline = ImageFont.truetype(FONT_BLACK_PATH, 48)
-        f_prod = ImageFont.truetype(FONT_BLACK_PATH, 26)
-        f_price = ImageFont.truetype(FONT_BLACK_PATH, 32)
-        f_pill = ImageFont.truetype(FONT_BLACK_PATH, 22)
+        f_headline = _load_font(FONT_BLACK_PATH, 48)
+        f_prod = _load_font(FONT_BLACK_PATH, 26)
+        f_price = _load_font(FONT_BLACK_PATH, 32)
+        f_pill = _load_font(FONT_BLACK_PATH, 22)
     else:
         f_headline = ImageFont.load_default()
         f_prod = f_price = f_pill = f_headline
 
     if os.path.exists(FONT_BOLD_PATH):
-        f_sub = ImageFont.truetype(FONT_BOLD_PATH, 21)
-        f_area = ImageFont.truetype(FONT_BOLD_PATH, 19)
-        f_curr = ImageFont.truetype(FONT_BOLD_PATH, 18)
-        f_cta = ImageFont.truetype(FONT_BOLD_PATH, 23)
+        f_sub = _load_font(FONT_BOLD_PATH, 21)
+        f_area = _load_font(FONT_BOLD_PATH, 19)
+        f_curr = _load_font(FONT_BOLD_PATH, 18)
+        f_cta = _load_font(FONT_BOLD_PATH, 23)
     else:
         f_sub = f_area = f_curr = f_cta = f_headline
 
